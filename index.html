@@ -45,9 +45,10 @@
       to { opacity: 1; transform: translateY(0); } 
     }
 
-    /* Memperbaiki area konten agar tidak tertutup footer */
-    /* Padding bottom 180px memberikan ruang aman untuk footer + bulk bar */
-    .content-area { padding-bottom: 180px; }
+    /* Penyesuaian area konten agar tidak tertutup footer/bulk bar */
+    .content-area { 
+      padding-bottom: 250px; /* Ditambah lagi agar lebih aman */
+    }
 
     .stok-badge {
         background: linear-gradient(135deg, #6366f1, #4338ca);
@@ -99,6 +100,13 @@
     }
     .custom-checkbox.active i {
         display: block;
+    }
+
+    /* Spacer transparan untuk memaksa area scroll */
+    .scroll-spacer {
+        height: 200px;
+        width: 100%;
+        pointer-events: none;
     }
   </style>
 </head>
@@ -402,7 +410,7 @@
         return;
       }
 
-      container.innerHTML = filtered.map(n => {
+      let html = filtered.map(n => {
         const verifiedQty = calculateVerifiedQtyForNota(n.uniqueId);
         const isFullyVerified = verifiedQty >= n.qty;
         const isPartiallyVerified = verifiedQty > 0 && verifiedQty < n.qty;
@@ -468,6 +476,10 @@
           </div>
         `;
       }).join('');
+
+      // Menambahkan spacer di akhir render list
+      html += '<div class="scroll-spacer"></div>';
+      container.innerHTML = html;
     }
 
     function renderFisik() {
@@ -483,7 +495,7 @@
         return;
       }
 
-      container.innerHTML = itemsWithStock.map(f => `
+      let html = itemsWithStock.map(f => `
         <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in">
           <div class="flex justify-between items-center mb-1 text-[8px] font-black uppercase tracking-widest">
             <span class="${f.jenis === 'Barang Masuk' ? 'text-emerald-500' : 'text-red-400'}">${f.jenis}</span>
@@ -499,6 +511,10 @@
           </div>
         </div>
       `).join('');
+
+      // Menambahkan spacer di akhir render list
+      html += '<div class="scroll-spacer"></div>';
+      container.innerHTML = html;
     }
 
     function openSmartVerify(notaId) {
