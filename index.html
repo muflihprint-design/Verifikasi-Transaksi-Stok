@@ -45,9 +45,8 @@
       to { opacity: 1; transform: translateY(0); } 
     }
 
-    /* Penyesuaian area konten agar tidak tertutup footer/bulk bar */
     .content-area { 
-      padding-bottom: 250px; /* Ditambah lagi agar lebih aman */
+      padding-bottom: 250px; 
     }
 
     .stok-badge {
@@ -102,7 +101,6 @@
         display: block;
     }
 
-    /* Spacer transparan untuk memaksa area scroll */
     .scroll-spacer {
         height: 200px;
         width: 100%;
@@ -162,16 +160,17 @@
     </div>
   </main>
 
+  <!-- Bulk Action Bar -->
   <div id="bulkActionBar" class="fixed bottom-24 left-4 right-4 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl z-[55] hidden flex items-center justify-between animate-in">
     <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center font-black text-lg" id="bulkCount">0</div>
         <div>
             <p class="text-[10px] font-black uppercase opacity-70">Nota Terpilih</p>
-            <p class="text-xs font-bold">Verifikasi Manual Massal</p>
+            <p class="text-xs font-bold">Verifikasi Massal</p>
         </div>
     </div>
     <button onclick="submitBulkVerifikasi()" id="btnBulkAction" class="bg-indigo-600 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500 active:scale-95 transition-all">
-        Verifikasi
+        Selesaikan Semua
     </button>
   </div>
 
@@ -477,7 +476,6 @@
         `;
       }).join('');
 
-      // Menambahkan spacer di akhir render list
       html += '<div class="scroll-spacer"></div>';
       container.innerHTML = html;
     }
@@ -512,7 +510,6 @@
         </div>
       `).join('');
 
-      // Menambahkan spacer di akhir render list
       html += '<div class="scroll-spacer"></div>';
       container.innerHTML = html;
     }
@@ -636,6 +633,7 @@
       const qtyAmbilFisik = selectedFisik.sisaReal;
       
       const payload = {
+        action: "verifyOne",
         notaId: String(selectedNota.uniqueId).trim(),
         fisikId: String(selectedFisik.id),
         namaItem: selectedNota.namaItem,
@@ -665,37 +663,49 @@
         const btn = document.getElementById('btnBulkAction');
         const originalText = btn.innerText;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i>';
+        btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> Memproses...';
         document.getElementById('syncStatus').classList.remove('hidden');
 
-        const notasToVerify = Array.from(selectedBulkIds).map(id => listItemsNota.find(n => n.uniqueId === id));
-        
-        const promises = notasToVerify.map(n => {
+        // Kumpulkan semua payload ke dalam satu array
+        const batchData = Array.from(selectedBulkIds).map(id => {
+            const n = listItemsNota.find(item => item.uniqueId === id);
             const remainingToVerify = n.qty - calculateVerifiedQtyForNota(n.uniqueId);
-            const payload = {
+            return {
                 notaId: String(n.uniqueId).trim(),
-                fisikId: "MANUAL",
+                fisikId: "MANUAL_BULK",
                 namaItem: n.namaItem,
                 qtyNota: remainingToVerify,
                 qtyFisik: remainingToVerify,
                 status: "Surplus",
                 pelanggan: n.pelanggan
             };
-            
-            verifiedLogs.push(payload);
-            return fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
         });
 
+        // Buat satu payload besar untuk dikirimkan sekaligus
+        const bulkPayload = {
+            action: "verifyBulk",
+            data: batchData
+        };
+
         try {
-            await Promise.all(promises);
+            // Kirim satu request saja
+            await fetch(APPS_SCRIPT_URL, { 
+                method: 'POST', 
+                mode: 'no-cors', 
+                body: JSON.stringify(bulkPayload) 
+            });
+
+            // Update local state setelah pengiriman sukses (atau dianggap sukses oleh no-cors)
+            batchData.forEach(item => verifiedLogs.push(item));
             localStorage.setItem('cached_verified_logs', JSON.stringify(verifiedLogs));
+            
             selectedBulkIds.clear();
             updateBulkUI();
             renderNota();
             renderFisik();
             document.getElementById('syncStatus').classList.add('hidden');
         } catch (e) {
-            console.error(e);
+            console.error("Gagal melakukan verifikasi massal:", e);
         } finally {
             btn.disabled = false;
             btn.innerText = originalText;
