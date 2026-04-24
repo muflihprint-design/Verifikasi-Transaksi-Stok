@@ -13,7 +13,7 @@
       background: #f8fafc; 
       font-family: 'Plus Jakarta Sans', sans-serif; 
     }
-    .nota-card.verified { opacity: 0.7; border-color: #10b981 !important; background-color: #f0fdf4; }
+    .nota-card.verified { opacity: 0.7; border-color: #10b981 !important; background-color: #f0fdf4; border-style: solid; }
     .fisik-item-select.selected { border-color: #6366f1; background-color: #f5f3ff; }
     .scroll-custom::-webkit-scrollbar { width: 6px; }
     .scroll-custom::-webkit-scrollbar-track { background: transparent; }
@@ -24,7 +24,6 @@
 </head>
 <body class="text-slate-900 min-h-screen">
 
-  <!-- Navigasi Utama -->
   <nav class="bg-white border-b sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -38,7 +37,7 @@
       </div>
       <div class="flex items-center gap-2">
           <div id="syncStatus" class="hidden items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">
-              <i class="fas fa-cloud-upload-alt animate-bounce"></i> Menghubungkan...
+              <i class="fas fa-sync-alt animate-spin"></i> Sinkronisasi...
           </div>
           <button onclick="fetchAllData()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition flex items-center gap-2">
             <i id="refreshIcon" class="fas fa-sync-alt"></i> Segarkan
@@ -49,8 +48,6 @@
 
   <main class="max-w-7xl mx-auto p-4 lg:p-6">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      
-      <!-- KOLOM KIRI: DATA NOTA (DARI CSV) -->
       <section>
         <div class="flex items-center justify-between mb-4">
           <h2 class="font-extrabold text-indigo-600 flex items-center gap-2 uppercase text-xs tracking-widest">
@@ -63,7 +60,6 @@
         </div>
       </section>
 
-      <!-- KOLOM KANAN: RIWAYAT FISIK (DARI SUPABASE) -->
       <section>
         <div class="flex items-center justify-between mb-4">
           <h2 class="font-extrabold text-emerald-600 flex items-center gap-2 uppercase text-xs tracking-widest">
@@ -78,10 +74,9 @@
     </div>
   </main>
 
-  <!-- MODAL SMART VERIFY -->
+  <!-- Modal Verifikasi -->
   <div id="modalVerify" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl transition-all scale-95 opacity-0 duration-300 flex flex-col max-h-[90vh]" id="modalContent">
-      
       <div class="p-6 border-b bg-slate-50 flex justify-between items-center">
         <div>
           <h3 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
@@ -94,8 +89,7 @@
         </button>
       </div>
 
-      <!-- Detail Item Nota terpilih -->
-      <div id="vNotaHeader" class="p-4 text-white flex justify-between items-center shadow-inner transition-colors duration-500">
+      <div id="vNotaHeader" class="p-4 text-white flex justify-between items-center shadow-inner">
         <div class="flex-1">
           <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Item Nota</p>
           <h4 id="vNotaName" class="text-lg font-black leading-tight truncate">...</h4>
@@ -107,7 +101,6 @@
         </div>
       </div>
 
-      <!-- Daftar Pencocokan Log Gudang -->
       <div class="flex-1 overflow-y-auto p-6 space-y-4 scroll-custom">
         <div class="flex items-center justify-between">
             <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -115,16 +108,13 @@
             </h5>
             <span id="vTargetType" class="text-[9px] font-black px-2 py-1 rounded-md uppercase"></span>
         </div>
-        
         <div id="matchingFisikList" class="space-y-3"></div>
-
         <div id="noMatchMsg" class="hidden text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed">
           <i class="fas fa-box-open text-3xl text-slate-200 mb-3 block"></i>
           <p class="text-sm font-bold text-slate-400">Log belum diinput atau sudah terpakai nota lain.</p>
         </div>
       </div>
 
-      <!-- Panel Aksi -->
       <div class="p-6 bg-slate-50 border-t">
         <div id="selectionSummary" class="hidden mb-4 p-4 bg-white rounded-2xl border flex items-center justify-between shadow-sm">
             <div class="flex items-center gap-3">
@@ -136,7 +126,6 @@
             </div>
             <div id="vSelectedQty" class="text-xl font-black">0</div>
         </div>
-
         <div class="flex gap-3">
           <button onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition">Batal</button>
           <button id="btnAction" disabled onclick="submitVerifikasi()" class="flex-[2] py-4 bg-indigo-300 text-white font-black rounded-2xl transition-all cursor-not-allowed uppercase tracking-widest text-sm">Pilih Log Dahulu</button>
@@ -146,9 +135,6 @@
   </div>
 
   <script>
-    /**
-     * KONFIGURASI INTEGRASI
-     */
     const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv`;
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPoXAbTJxZb8u53WTJNX4JHIET4QRL0e2sHEPLljRZaD4G5kAuwWNsJOJ69RAYYAZv/exec";
     
@@ -163,25 +149,32 @@
     let selectedFisik = null;
 
     /**
-     * Memuat data pasangan yang sudah diverifikasi dari Apps Script
+     * Normalisasi ID untuk perbandingan yang lebih akurat
+     * Menghilangkan awalan N-, spasi, dan mengubah ke lowercase
      */
+    function normalizeId(id) {
+      if (!id) return "";
+      return String(id).replace(/^N-/i, '').trim().toLowerCase();
+    }
+
     async function loadVerifiedPairs() {
       try {
         const res = await fetch(`${APPS_SCRIPT_URL}?action=getVerified`);
         const data = await res.json();
         if (Array.isArray(data)) {
-          verifiedPairs = data;
-          localStorage.setItem('verified_nota_pairs', JSON.stringify(data));
+          verifiedPairs = data.map(p => ({
+            notaId: String(p.notaId || "").trim(),
+            fisikId: String(p.fisikId || "").trim()
+          }));
+          localStorage.setItem('verified_nota_pairs', JSON.stringify(verifiedPairs));
+          console.log("Cloud Verified Data Loaded:", verifiedPairs);
         }
       } catch (e) {
-        console.warn("Gagal mengambil data cloud, menggunakan cache lokal.");
+        console.warn("Using Local Cache for Verified Data");
         verifiedPairs = JSON.parse(localStorage.getItem('verified_nota_pairs') || '[]'); 
       }
     }
 
-    /**
-     * Mengambil data dari Google Sheet CSV
-     */
     async function loadNota() {
       try {
         const res = await fetch(CSV_URL);
@@ -193,7 +186,7 @@
           const parts = r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
           if (parts.length < 11) return;
 
-          const idTrx = parts[0];
+          const idTrx = parts[0].trim();
           const tgl = parts[1];
           const pelanggan = parts[2];
           const kategori = parts[3]?.trim(); 
@@ -216,36 +209,33 @@
                   });
                 });
               }
-            } catch (e) { console.error("JSON Parse Error", e); }
+            } catch (e) { console.error("JSON Error", e); }
           }
         });
         renderNota();
-      } catch (e) { console.error("CSV Fetch Error", e); }
+      } catch (e) { console.error("CSV Error", e); }
     }
 
-    /**
-     * Mengambil data riwayat fisik dari Supabase
-     */
     async function loadFisik() {
       try {
         const { data, error } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false });
         if(error) throw error;
         listFisik = data || [];
         renderFisik();
-      } catch (e) { console.error("Supabase Fetch Error", e); }
+      } catch (e) { console.error("Supabase Error", e); }
     }
 
-    /**
-     * Render daftar nota di kolom kiri
-     */
     function renderNota() {
       const container = document.getElementById('containerNota');
       document.getElementById('countNota').innerText = `${listItemsNota.length} Item`;
       
-      const verifiedNotaIds = verifiedPairs.map(p => p.notaId);
+      // Buat map ID ternormalisasi untuk pengecekan cepat
+      const normalizedVerifiedIds = verifiedPairs.map(p => normalizeId(p.notaId));
 
       container.innerHTML = listItemsNota.map(n => {
-        const isVerified = verifiedNotaIds.includes(n.uniqueId);
+        const currentNormalized = normalizeId(n.uniqueId);
+        const isVerified = normalizedVerifiedIds.includes(currentNormalized);
+        
         return `
           <div onclick="${isVerified ? '' : `openSmartVerify('${n.uniqueId}')`}" class="nota-card animate-in bg-white p-4 rounded-2xl border-2 border-transparent shadow-sm ${isVerified ? 'verified cursor-default' : 'cursor-pointer hover:border-indigo-200'} transition-all">
             <div class="flex justify-between items-start mb-2">
@@ -260,14 +250,12 @@
               <div class="text-[10px] font-bold text-slate-400 truncate w-2/3"><i class="fas fa-user mr-1"></i> ${n.pelanggan}</div>
               <div class="text-xl font-black ${isVerified ? 'text-emerald-500' : 'text-indigo-600'}">${n.qty} <span class="text-[10px]">pcs</span></div>
             </div>
+            ${!isVerified ? `<div class="mt-2 text-[7px] text-slate-300 font-mono opacity-50">${n.uniqueId}</div>` : ''}
           </div>
         `;
       }).join('');
     }
 
-    /**
-     * Render riwayat fisik di kolom kanan
-     */
     function renderFisik() {
       const container = document.getElementById('containerFisik');
       const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
@@ -292,9 +280,6 @@
       `).join('');
     }
 
-    /**
-     * Membuka modal verifikasi cerdas
-     */
     function openSmartVerify(notaId) {
       selectedNota = listItemsNota.find(n => n.uniqueId === notaId);
       selectedFisik = null;
@@ -304,11 +289,11 @@
       const targetFisikType = selectedNota.kategori === 'Penjualan' ? 'Barang Keluar' : 'Barang Masuk';
 
       if (selectedNota.kategori === 'Penjualan') {
-        header.className = "p-4 bg-blue-600 text-white flex justify-between items-center shadow-inner transition-colors duration-500";
+        header.style.backgroundColor = "#2563eb"; // Blue 600
         targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-red-100 text-red-600";
         targetTypeBadge.innerText = "Target: Barang Keluar";
       } else {
-        header.className = "p-4 bg-orange-600 text-white flex justify-between items-center shadow-inner transition-colors duration-500";
+        header.style.backgroundColor = "#ea580c"; // Orange 600
         targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-emerald-100 text-emerald-600";
         targetTypeBadge.innerText = "Target: Barang Masuk";
       }
@@ -320,7 +305,6 @@
       const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
       const query = selectedNota.namaItem.toLowerCase().split(' ')[0]; 
       
-      // Pencarian pintar: cari item gudang yang belum dipakai, tipenya sesuai, dan namanya mirip
       const matches = listFisik.filter(f => 
         !usedFisikIds.includes(String(f.id)) && 
         f.jenis === targetFisikType && (
@@ -337,7 +321,7 @@
       summary.classList.add('hidden');
       btn.disabled = true;
       btn.className = "flex-[2] py-4 bg-slate-100 text-slate-400 font-black rounded-2xl cursor-not-allowed uppercase tracking-widest text-sm";
-      btn.innerText = "Pilih Riwayat";
+      btn.innerText = "Pilih Log Dahulu";
 
       if (matches.length > 0) {
         noMatch.classList.add('hidden');
@@ -371,9 +355,6 @@
       }, 50);
     }
 
-    /**
-     * Memilih item fisik dalam modal
-     */
     function selectFisikItem(fisikId) {
       selectedFisik = listFisik.find(f => f.id == fisikId);
       document.querySelectorAll('.fisik-item-select').forEach(el => el.classList.remove('selected', 'border-indigo-500'));
@@ -419,9 +400,6 @@
       setTimeout(() => modal.classList.add('hidden'), 300);
     }
 
-    /**
-     * Mengirim data verifikasi ke Apps Script
-     */
     async function submitVerifikasi() {
       const btn = document.getElementById('btnAction');
       const syncStatus = document.getElementById('syncStatus');
@@ -431,7 +409,7 @@
       syncStatus.classList.remove('hidden');
 
       const payload = {
-        notaId: selectedNota.uniqueId,
+        notaId: String(selectedNota.uniqueId).trim(),
         fisikId: String(selectedFisik.id),
         namaItem: selectedNota.namaItem,
         qtyNota: selectedNota.qty,
@@ -440,16 +418,15 @@
       };
 
       try {
-        // Menggunakan mode text/plain untuk menghindari preflight CORS
         await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           body: JSON.stringify(payload) 
         });
 
-        // Update UI Lokal setelah berhasil
+        // Update state lokal
         verifiedPairs.push({
-          notaId: selectedNota.uniqueId,
-          fisikId: String(selectedFisik.id)
+          notaId: payload.notaId,
+          fisikId: payload.fisikId
         });
         
         localStorage.setItem('verified_nota_pairs', JSON.stringify(verifiedPairs));
@@ -460,7 +437,7 @@
         renderFisik();
 
       } catch (e) {
-        console.error("Gagal sinkronisasi cloud", e);
+        console.error("Cloud Sync Error", e);
         btn.disabled = false;
         btn.innerText = "Coba Lagi";
         syncStatus.innerText = "Gagal Sinkron!";
@@ -468,15 +445,15 @@
       }
     }
 
-    /**
-     * Memuat ulang semua data dari semua sumber
-     */
     async function fetchAllData() {
       const icon = document.getElementById('refreshIcon');
       if(icon) icon.classList.add('animate-spin');
       
+      // Tahap 1: Muat data dari cloud
+      await loadVerifiedPairs();
+      
+      // Tahap 2: Muat data nota dan fisik
       await Promise.all([
-        loadVerifiedPairs(),
         loadNota(), 
         loadFisik()
       ]);
