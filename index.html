@@ -106,6 +106,16 @@
         width: 100%;
         pointer-events: none;
     }
+
+    /* Filter Styles */
+    .filter-btn {
+        transition: all 0.2s ease;
+    }
+    .filter-btn.active {
+        background-color: #4f46e5;
+        color: white;
+        box-shadow: 0 4px 6px -1px rgb(79 70 229 / 0.2);
+    }
   </style>
 </head>
 <body class="text-slate-900 min-h-screen">
@@ -128,13 +138,26 @@
       </button>
     </div>
 
-    <div class="px-4 pb-3">
+    <div class="px-4 pb-3 space-y-3">
       <div class="relative group">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <i class="fas fa-search text-slate-400 text-xs"></i>
         </div>
         <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Cari barang atau pelanggan..." 
           class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
+      </div>
+      
+      <!-- Filter Status Nota -->
+      <div id="filterNotaBar" class="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <button onclick="setFilter('unverified')" id="filter-unverified" class="filter-btn active whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-500">
+            Belum Verifikasi
+        </button>
+        <button onclick="setFilter('verified')" id="filter-verified" class="filter-btn whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-500">
+            Sudah Verifikasi
+        </button>
+        <button onclick="setFilter('all')" id="filter-all" class="filter-btn whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-500">
+            Semua
+        </button>
       </div>
     </div>
   </nav>
@@ -143,7 +166,7 @@
     <div id="pageNota" class="space-y-3">
         <div class="flex items-center justify-between px-1 mb-2">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antrean Verifikasi</span>
+              <span id="labelAntrean" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antrean Verifikasi</span>
               <span id="countNota" class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">0</span>
             </div>
             <button onclick="toggleSelectAll()" id="btnSelectAll" class="text-[10px] font-black text-indigo-600 uppercase">Pilih Semua</button>
@@ -243,6 +266,7 @@
     let selectedFisik = null;
     let searchTerm = "";
     let selectedBulkIds = new Set();
+    let statusFilter = "unverified"; // Default filter
 
     function switchTab(tab) {
       const pageNota = document.getElementById('pageNota');
@@ -250,10 +274,12 @@
       const tabNota = document.getElementById('tabNota');
       const tabGudang = document.getElementById('tabGudang');
       const pageTitle = document.getElementById('pageTitle');
+      const filterBar = document.getElementById('filterNotaBar');
 
       if (tab === 'nota') {
         pageNota.classList.remove('hidden');
         pageGudang.classList.add('hidden');
+        filterBar.classList.remove('hidden');
         tabNota.classList.add('tab-active');
         tabNota.classList.remove('text-slate-400');
         tabGudang.classList.remove('tab-active');
@@ -262,6 +288,7 @@
       } else {
         pageNota.classList.add('hidden');
         pageGudang.classList.remove('hidden');
+        filterBar.classList.add('hidden');
         tabGudang.classList.add('tab-active');
         tabGudang.classList.remove('text-slate-400');
         tabNota.classList.remove('tab-active');
@@ -269,6 +296,24 @@
         pageTitle.innerText = "Log Gudang";
       }
       window.scrollTo(0,0);
+    }
+
+    function setFilter(filter) {
+        statusFilter = filter;
+        
+        // Update UI tombol
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.getElementById(`filter-${filter}`).classList.add('active');
+
+        // Update Label
+        const label = document.getElementById('labelAntrean');
+        if (filter === 'unverified') label.innerText = "Antrean Verifikasi";
+        else if (filter === 'verified') label.innerText = "Riwayat Verifikasi";
+        else label.innerText = "Semua Transaksi";
+
+        renderNota();
     }
 
     function calculateRemainingStock(fisikId, initialQty) {
@@ -322,7 +367,6 @@
               const items = JSON.parse(cleanJson);
               if (Array.isArray(items)) {
                 items.forEach((item, itemIdx) => {
-                  // FILTER: Abaikan item dengan kategori "TTH"
                   if (item.kategori === "TTH") return;
 
                   listItemsNota.push({
@@ -360,16 +404,25 @@
         const filtered = listItemsNota.filter(n => {
             const verifiedQty = calculateVerifiedQtyForNota(n.uniqueId);
             const isFullyVerified = verifiedQty >= n.qty;
+            
+            // Logika filter status
+            let matchesFilter = true;
+            if (statusFilter === 'unverified') matchesFilter = !isFullyVerified;
+            else if (statusFilter === 'verified') matchesFilter = isFullyVerified;
+
             const matchesSearch = n.namaItem.toLowerCase().includes(searchTerm) || 
                                   n.pelanggan.toLowerCase().includes(searchTerm) ||
                                   n.idTrx.toLowerCase().includes(searchTerm);
-            return !isFullyVerified && matchesSearch;
+            return matchesFilter && matchesSearch;
         });
 
-        if (selectedBulkIds.size === filtered.length) {
+        if (selectedBulkIds.size === filtered.length && filtered.length > 0) {
             selectedBulkIds.clear();
         } else {
-            filtered.forEach(n => selectedBulkIds.add(n.uniqueId));
+            filtered.forEach(n => {
+                const verifiedQty = calculateVerifiedQtyForNota(n.uniqueId);
+                if (verifiedQty < n.qty) selectedBulkIds.add(n.uniqueId);
+            });
         }
         updateBulkUI();
         renderNota();
@@ -399,16 +452,28 @@
 
     function renderNota() {
       const container = document.getElementById('containerNota');
-      const filtered = listItemsNota.filter(n => 
-        n.namaItem.toLowerCase().includes(searchTerm) || 
-        n.pelanggan.toLowerCase().includes(searchTerm) ||
-        n.idTrx.toLowerCase().includes(searchTerm)
-      );
+      
+      const filtered = listItemsNota.filter(n => {
+        const verifiedQty = calculateVerifiedQtyForNota(n.uniqueId);
+        const isFullyVerified = verifiedQty >= n.qty;
+        
+        // Logika Filter Status
+        let passFilter = true;
+        if (statusFilter === 'unverified') passFilter = !isFullyVerified;
+        else if (statusFilter === 'verified') passFilter = isFullyVerified;
+
+        // Logika Search
+        const passSearch = n.namaItem.toLowerCase().includes(searchTerm) || 
+                           n.pelanggan.toLowerCase().includes(searchTerm) ||
+                           n.idTrx.toLowerCase().includes(searchTerm);
+
+        return passFilter && passSearch;
+      });
 
       document.getElementById('countNota').innerText = filtered.length;
 
       if(filtered.length === 0) {
-        container.innerHTML = `<div class="text-center py-20 text-slate-300 italic text-xs">Nota tidak ditemukan.</div>`;
+        container.innerHTML = `<div class="text-center py-20 text-slate-300 italic text-xs">Tidak ada data untuk filter ini.</div>`;
         return;
       }
 
