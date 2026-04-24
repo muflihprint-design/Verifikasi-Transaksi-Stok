@@ -311,10 +311,10 @@
           const idTrx = parts[0].trim();
           const tgl = parts[1];
           const pelanggan = parts[2];
-          const kategori = parts[3]?.trim(); 
+          const kategoriNota = parts[3]?.trim(); 
           let jsonString = parts[10];
 
-          if ((kategori === "Pembelian" || kategori === "Penjualan") && jsonString) {
+          if ((kategoriNota === "Pembelian" || kategoriNota === "Penjualan") && jsonString) {
             try {
               let cleanJson = jsonString.trim();
               if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) cleanJson = cleanJson.substring(1, cleanJson.length - 1);
@@ -322,12 +322,15 @@
               const items = JSON.parse(cleanJson);
               if (Array.isArray(items)) {
                 items.forEach((item, itemIdx) => {
+                  // FILTER: Abaikan item dengan kategori "TTH"
+                  if (item.kategori === "TTH") return;
+
                   listItemsNota.push({
                     uniqueId: `N-${idTrx}-${itemIdx}`,
                     idTrx: idTrx, tgl: tgl, pelanggan: pelanggan,
                     namaItem: item.nama || "Item",
                     qty: parseInt(item.qty || 0),
-                    kategori: kategori
+                    kategori: kategoriNota
                   });
                 });
               }
@@ -666,7 +669,6 @@
         btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> Memproses...';
         document.getElementById('syncStatus').classList.remove('hidden');
 
-        // Kumpulkan semua payload ke dalam satu array
         const batchData = Array.from(selectedBulkIds).map(id => {
             const n = listItemsNota.find(item => item.uniqueId === id);
             const remainingToVerify = n.qty - calculateVerifiedQtyForNota(n.uniqueId);
@@ -681,21 +683,18 @@
             };
         });
 
-        // Buat satu payload besar untuk dikirimkan sekaligus
         const bulkPayload = {
             action: "verifyBulk",
             data: batchData
         };
 
         try {
-            // Kirim satu request saja
             await fetch(APPS_SCRIPT_URL, { 
                 method: 'POST', 
                 mode: 'no-cors', 
                 body: JSON.stringify(bulkPayload) 
             });
 
-            // Update local state setelah pengiriman sukses (atau dianggap sukses oleh no-cors)
             batchData.forEach(item => verifiedLogs.push(item));
             localStorage.setItem('cached_verified_logs', JSON.stringify(verifiedLogs));
             
