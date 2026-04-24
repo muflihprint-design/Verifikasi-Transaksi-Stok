@@ -45,7 +45,9 @@
       to { opacity: 1; transform: translateY(0); } 
     }
 
-    .content-area { padding-bottom: 120px; }
+    /* Memperbaiki area konten agar tidak tertutup footer */
+    /* Padding bottom 180px memberikan ruang aman untuk footer + bulk bar */
+    .content-area { padding-bottom: 180px; }
 
     .stok-badge {
         background: linear-gradient(135deg, #6366f1, #4338ca);
@@ -76,7 +78,6 @@
         text-transform: uppercase;
     }
 
-    /* Custom Checkbox */
     .custom-checkbox {
         width: 20px;
         height: 20px;
@@ -103,7 +104,6 @@
 </head>
 <body class="text-slate-900 min-h-screen">
 
-  <!-- Header -->
   <nav class="bg-white border-b sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -133,7 +133,6 @@
     </div>
   </nav>
 
-  <!-- Main Content Area -->
   <main class="content-area p-4">
     <div id="pageNota" class="space-y-3">
         <div class="flex items-center justify-between px-1 mb-2">
@@ -155,7 +154,6 @@
     </div>
   </main>
 
-  <!-- Bulk Action Bar (Floating) -->
   <div id="bulkActionBar" class="fixed bottom-24 left-4 right-4 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl z-[55] hidden flex items-center justify-between animate-in">
     <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center font-black text-lg" id="bulkCount">0</div>
@@ -169,7 +167,6 @@
     </button>
   </div>
 
-  <!-- Bottom Navigation -->
   <footer class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] flex justify-around items-center">
     <button onclick="switchTab('nota')" id="tabNota" class="flex flex-col items-center gap-1 tab-active transition-all flex-1">
       <i class="fas fa-file-invoice-dollar text-xl"></i>
@@ -182,14 +179,11 @@
     </button>
   </footer>
 
-  <!-- Modal Verifikasi -->
   <div id="modalVerify" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden flex flex-col justify-end">
     <div class="bg-white w-full rounded-t-[32px] overflow-hidden shadow-2xl transition-all translate-y-full duration-300 flex flex-col max-h-[95vh]" id="modalContent">
-      
       <div onclick="closeModal()" class="w-full flex justify-center py-3 cursor-pointer">
           <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
       </div>
-
       <div id="vNotaHeader" class="mx-4 p-5 rounded-2xl text-white shadow-lg">
         <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Verifikasi Item Nota</p>
         <h4 id="vNotaName" class="text-lg font-black leading-tight mb-1 truncate">...</h4>
@@ -199,22 +193,17 @@
           <p id="vNotaDetail" class="text-[10px] opacity-80 uppercase font-bold truncate">...</p>
         </div>
       </div>
-
       <div class="flex-1 overflow-y-auto p-5 space-y-4">
         <div class="flex items-center justify-between">
             <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Stok Gudang</h5>
             <span id="vTargetType" class="text-[8px] font-black px-2 py-0.5 rounded uppercase"></span>
         </div>
-        
         <div id="matchingFisikList" class="space-y-3 pb-4"></div>
-        
         <div id="noMatchMsg" class="hidden text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed">
           <i class="fas fa-ghost text-2xl text-slate-200 mb-2 block"></i>
           <p class="text-xs font-bold text-slate-400">Tidak ada stok yang cocok.</p>
         </div>
       </div>
-
-      <!-- Footer Modal -->
       <div class="p-5 bg-slate-50 border-t space-y-3 pb-8">
         <div id="selectionSummary" class="hidden p-3 bg-white rounded-xl border flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -226,7 +215,6 @@
             </div>
             <div id="vSelectedQty" class="text-lg font-black">0</div>
         </div>
-
         <button id="btnAction" disabled onclick="submitVerifikasi()" class="w-full py-4 bg-slate-200 text-slate-400 font-black rounded-2xl transition-all uppercase tracking-widest text-sm shadow-md">
             Pilih Stok Gudang
         </button>
@@ -273,6 +261,7 @@
         tabNota.classList.add('text-slate-400');
         pageTitle.innerText = "Log Gudang";
       }
+      window.scrollTo(0,0);
     }
 
     function calculateRemainingStock(fisikId, initialQty) {
@@ -665,7 +654,6 @@
 
         const notasToVerify = Array.from(selectedBulkIds).map(id => listItemsNota.find(n => n.uniqueId === id));
         
-        // Verifikasi manual (bulk) tidak mengurangi stok fisik spesifik (fisikId: "MANUAL")
         const promises = notasToVerify.map(n => {
             const remainingToVerify = n.qty - calculateVerifiedQtyForNota(n.uniqueId);
             const payload = {
@@ -678,7 +666,6 @@
                 pelanggan: n.pelanggan
             };
             
-            // Simpan ke local state segera
             verifiedLogs.push(payload);
             return fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
         });
