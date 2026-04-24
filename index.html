@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Muflih Print - Verifikasi Nota (Smart Match)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+    body { 
+      background: #f8fafc; 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+    }
+    .nota-card.verified { opacity: 0.7; border-color: #10b981 !important; background-color: #f0fdf4; }
+    .fisik-item-select.selected { border-color: #6366f1; background-color: #f5f3ff; }
+    .scroll-custom::-webkit-scrollbar { width: 6px; }
+    .scroll-custom::-webkit-scrollbar-track { background: transparent; }
+    .scroll-custom::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .animate-in { animation: fadeIn 0.3s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="text-slate-900 min-h-screen">
+
+  <!-- Navigasi -->
+  <nav class="bg-white border-b sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+          <i class="fas fa-check-double text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-slate-800 tracking-tight leading-none uppercase">Verifikasi Logistik</h1>
+          <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sinkronisasi Cloud</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+          <div id="syncStatus" class="hidden items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">
+              <i class="fas fa-cloud-upload-alt animate-bounce"></i> Menghubungkan...
+          </div>
+          <button onclick="fetchAllData()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition flex items-center gap-2">
+            <i id="refreshIcon" class="fas fa-sync-alt"></i> Segarkan
+          </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto p-4 lg:p-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- KOLOM KIRI: DATA NOTA -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-extrabold text-indigo-600 flex items-center gap-2 uppercase text-xs tracking-widest">
+            <i class="fas fa-file-invoice"></i> Item Transaksi Nota
+          </h2>
+          <span id="countNota" class="px-2 py-1 bg-indigo-100 text-indigo-600 text-[10px] font-black rounded-md uppercase">0 Item</span>
+        </div>
+        <div id="containerNota" class="space-y-3 max-h-[75vh] overflow-y-auto scroll-custom pr-2">
+          <div class="text-center py-10 text-slate-400 text-xs animate-pulse">Memuat data nota...</div>
+        </div>
+      </section>
+
+      <!-- KOLOM KANAN: RIWAYAT FISIK -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-extrabold text-emerald-600 flex items-center gap-2 uppercase text-xs tracking-widest">
+            <i class="fas fa-history"></i> Log Gudang Tersedia
+          </h2>
+          <span id="countFisik" class="px-2 py-1 bg-emerald-100 text-emerald-600 text-[10px] font-black rounded-md uppercase">0 Log</span>
+        </div>
+        <div id="containerFisik" class="space-y-3 max-h-[75vh] overflow-y-auto scroll-custom pr-2">
+           <div class="text-center py-10 text-slate-400 text-xs animate-pulse">Memuat data gudang...</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- MODAL SMART VERIFY -->
+  <div id="modalVerify" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl transition-all scale-95 opacity-0 duration-300 flex flex-col max-h-[90vh]" id="modalContent">
+      
+      <div class="p-6 border-b bg-slate-50 flex justify-between items-center">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+            <i class="fas fa-shield-alt text-indigo-500"></i> Validasi Persediaan
+          </h3>
+          <p class="text-xs text-slate-500 font-medium">Log yang sudah terverifikasi disembunyikan otomatis.</p>
+        </div>
+        <button onclick="closeModal()" class="w-10 h-10 rounded-full hover:bg-white flex items-center justify-center text-slate-400 transition-colors">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Detail Item Nota -->
+      <div id="vNotaHeader" class="p-4 text-white flex justify-between items-center shadow-inner transition-colors duration-500">
+        <div class="flex-1">
+          <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Item Nota</p>
+          <h4 id="vNotaName" class="text-lg font-black leading-tight truncate">...</h4>
+          <p id="vNotaDetail" class="text-[10px] opacity-80 mt-0.5 uppercase font-bold tracking-tighter">...</p>
+        </div>
+        <div class="text-right ml-4">
+          <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Target</p>
+          <div class="text-3xl font-black"><span id="vNotaQty">0</span> <span class="text-sm font-bold opacity-60">pcs</span></div>
+        </div>
+      </div>
+
+      <!-- Pencarian Riwayat Fisik -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-4 scroll-custom">
+        <div class="flex items-center justify-between">
+            <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <i class="fas fa-search-location text-indigo-400"></i> Pilih Log Gudang yang Sesuai
+            </h5>
+            <span id="vTargetType" class="text-[9px] font-black px-2 py-1 rounded-md uppercase"></span>
+        </div>
+        
+        <div id="matchingFisikList" class="space-y-3"></div>
+
+        <div id="noMatchMsg" class="hidden text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed">
+          <i class="fas fa-box-open text-3xl text-slate-200 mb-3 block"></i>
+          <p class="text-sm font-bold text-slate-400">Log belum diinput atau sudah terpakai nota lain.</p>
+        </div>
+      </div>
+
+      <!-- Footer Action -->
+      <div class="p-6 bg-slate-50 border-t">
+        <div id="selectionSummary" class="hidden mb-4 p-4 bg-white rounded-2xl border flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+                <div id="diffIcon" class="w-10 h-10 rounded-full flex items-center justify-center text-white"></div>
+                <div>
+                    <p id="summaryTitle" class="text-xs font-black text-slate-800">Item Terpilih</p>
+                    <p id="summaryDesc" class="text-[10px] text-slate-500 font-medium">Logistik vs Nota</p>
+                </div>
+            </div>
+            <div id="vSelectedQty" class="text-xl font-black">0</div>
+        </div>
+
+        <div class="flex gap-3">
+          <button onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition">Batal</button>
+          <button id="btnAction" disabled onclick="submitVerifikasi()" class="flex-[2] py-4 bg-indigo-300 text-white font-black rounded-2xl transition-all cursor-not-allowed uppercase tracking-widest text-sm">Pilih Log Dahulu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Konfigurasi API
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv`;
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlRPv4K_j2II6GCwW2R2Js_r1B6SjK1JVQOPK33AlZBdueP9lAWyzmRAhtqlmflauV/exec";
+    
+    const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let listItemsNota = []; 
+    let listFisik = [];
+    let verifiedPairs = []; 
+
+    // Muat data verifikasi dari Apps Script atau Lokal
+    async function loadVerifiedPairs() {
+      try {
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=getVerified`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          verifiedPairs = data;
+          localStorage.setItem('verified_nota_pairs', JSON.stringify(data));
+        }
+      } catch (e) {
+        console.warn("Gagal mengambil data cloud, menggunakan cache lokal.");
+        verifiedPairs = JSON.parse(localStorage.getItem('verified_nota_pairs') || '[]'); 
+      }
+    }
+
+    async function loadNota() {
+      try {
+        const res = await fetch(CSV_URL);
+        const text = await res.text();
+        const rows = text.split('\n').slice(1);
+        listItemsNota = []; 
+
+        rows.forEach((r) => {
+          const parts = r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+          if (parts.length < 11) return;
+
+          const idTrx = parts[0];
+          const tgl = parts[1];
+          const pelanggan = parts[2];
+          const kategori = parts[3]?.trim(); 
+          let jsonString = parts[10];
+
+          if ((kategori === "Pembelian" || kategori === "Penjualan") && jsonString) {
+            try {
+              let cleanJson = jsonString.trim();
+              if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) cleanJson = cleanJson.substring(1, cleanJson.length - 1);
+              cleanJson = cleanJson.replace(/""/g, '"');
+              const items = JSON.parse(cleanJson);
+              if (Array.isArray(items)) {
+                items.forEach((item, itemIdx) => {
+                  listItemsNota.push({
+                    uniqueId: `N-${idTrx}-${itemIdx}`,
+                    idTrx: idTrx, tgl: tgl, pelanggan: pelanggan,
+                    namaItem: item.nama || "Tanpa Nama",
+                    qty: parseInt(item.qty || 0),
+                    kategori: kategori
+                  });
+                });
+              }
+            } catch (e) {}
+          }
+        });
+        renderNota();
+      } catch (e) { console.error("CSV Error", e); }
+    }
+
+    async function loadFisik() {
+      try {
+        const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false });
+        listFisik = data || [];
+        renderFisik();
+      } catch (e) { console.error("Supabase Error", e); }
+    }
+
+    function renderNota() {
+      const container = document.getElementById('containerNota');
+      document.getElementById('countNota').innerText = `${listItemsNota.length} Item`;
+      
+      const verifiedNotaIds = verifiedPairs.map(p => p.notaId);
+
+      container.innerHTML = listItemsNota.map(n => {
+        const isVerified = verifiedNotaIds.includes(n.uniqueId);
+        return `
+          <div onclick="${isVerified ? '' : `openSmartVerify('${n.uniqueId}')`}" class="nota-card animate-in bg-white p-4 rounded-2xl border-2 border-transparent shadow-sm ${isVerified ? 'verified cursor-default' : 'cursor-pointer hover:border-indigo-200'} transition-all">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-[8px] px-2 py-0.5 rounded ${n.kategori === 'Penjualan' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} font-bold uppercase">${n.kategori}</span>
+              ${isVerified ? 
+                '<span class="flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase tracking-tighter"><i class="fas fa-check-circle"></i> Terverifikasi</span>' : 
+                `<span class="text-[9px] font-bold text-slate-400">${n.tgl}</span>`
+              }
+            </div>
+            <div class="font-extrabold text-slate-800 leading-tight">${n.namaItem}</div>
+            <div class="flex justify-between items-end mt-3">
+              <div class="text-[10px] font-bold text-slate-400 truncate w-2/3"><i class="fas fa-user mr-1"></i> ${n.pelanggan}</div>
+              <div class="text-xl font-black ${isVerified ? 'text-emerald-500' : 'text-indigo-600'}">${n.qty} <span class="text-[10px]">pcs</span></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFisik() {
+      const container = document.getElementById('containerFisik');
+      const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
+      const availableFisik = listFisik.filter(f => !usedFisikIds.includes(String(f.id)));
+
+      document.getElementById('countFisik').innerText = `${availableFisik.length} Log`;
+      
+      if(availableFisik.length === 0) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-300 italic text-xs">Semua riwayat gudang telah terverifikasi.</div>`;
+        return;
+      }
+
+      container.innerHTML = availableFisik.map(f => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in">
+          <div class="flex justify-between items-start mb-1 text-[9px] font-bold">
+            <span class="${f.jenis === 'Barang Masuk' ? 'text-emerald-500' : 'text-red-400'}">${f.jenis}</span>
+            <span class="text-slate-300">${new Date(f.created_at).toLocaleDateString()}</span>
+          </div>
+          <div class="font-bold text-slate-700 text-sm truncate">${f.nama_barang}</div>
+          <div class="text-right font-black text-slate-500">${f.jumlah} pcs</div>
+        </div>
+      `).join('');
+    }
+
+    function openSmartVerify(notaId) {
+      selectedNota = listItemsNota.find(n => n.uniqueId === notaId);
+      selectedFisik = null;
+      
+      const header = document.getElementById('vNotaHeader');
+      const targetTypeBadge = document.getElementById('vTargetType');
+      const targetFisikType = selectedNota.kategori === 'Penjualan' ? 'Barang Keluar' : 'Barang Masuk';
+
+      if (selectedNota.kategori === 'Penjualan') {
+        header.className = "p-4 bg-blue-600 text-white flex justify-between items-center shadow-inner transition-colors duration-500";
+        targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-red-100 text-red-600";
+        targetTypeBadge.innerText = "Target: Barang Keluar";
+      } else {
+        header.className = "p-4 bg-orange-600 text-white flex justify-between items-center shadow-inner transition-colors duration-500";
+        targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-emerald-100 text-emerald-600";
+        targetTypeBadge.innerText = "Target: Barang Masuk";
+      }
+
+      document.getElementById('vNotaName').innerText = selectedNota.namaItem;
+      document.getElementById('vNotaQty').innerText = selectedNota.qty;
+      document.getElementById('vNotaDetail').innerText = `${selectedNota.kategori} • TRX #${selectedNota.idTrx}`;
+      
+      const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
+      const query = selectedNota.namaItem.toLowerCase().split(' ')[0]; 
+      
+      const matches = listFisik.filter(f => 
+        !usedFisikIds.includes(String(f.id)) && 
+        f.jenis === targetFisikType && (
+          f.nama_barang.toLowerCase().includes(query) || 
+          selectedNota.namaItem.toLowerCase().includes(f.nama_barang.toLowerCase().split(' ')[0])
+        )
+      );
+
+      const listContainer = document.getElementById('matchingFisikList');
+      const noMatch = document.getElementById('noMatchMsg');
+      const btn = document.getElementById('btnAction');
+      const summary = document.getElementById('selectionSummary');
+
+      summary.classList.add('hidden');
+      btn.disabled = true;
+      btn.className = "flex-[2] py-4 bg-slate-100 text-slate-400 font-black rounded-2xl cursor-not-allowed uppercase tracking-widest text-sm";
+      btn.innerText = "Pilih Riwayat";
+
+      if (matches.length > 0) {
+        noMatch.classList.add('hidden');
+        listContainer.innerHTML = matches.map(f => `
+          <div onclick="selectFisikItem('${f.id}')" id="modal-fisik-${f.id}" class="fisik-item-select p-4 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-indigo-400 transition-all flex justify-between items-center group">
+            <div class="flex-1 min-w-0 pr-4">
+               <div class="flex items-center gap-2 mb-1">
+                 <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${f.jenis === 'Barang Masuk' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}">${f.jenis}</span>
+                 <span class="text-[9px] font-bold text-slate-300">#${f.id}</span>
+               </div>
+               <div class="font-extrabold text-slate-700 text-sm truncate group-hover:text-indigo-600">${f.nama_barang}</div>
+               <div class="text-[10px] text-slate-400 font-medium">${new Date(f.created_at).toLocaleDateString()}</div>
+            </div>
+            <div class="text-right">
+                <div class="text-xl font-black text-slate-800">${f.jumlah}</div>
+                <div class="text-[9px] font-black text-slate-300 uppercase tracking-tighter">PCS</div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        listContainer.innerHTML = '';
+        noMatch.classList.remove('hidden');
+      }
+
+      const modal = document.getElementById('modalVerify');
+      const content = document.getElementById('modalContent');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+      }, 50);
+    }
+
+    function selectFisikItem(fisikId) {
+      selectedFisik = listFisik.find(f => f.id == fisikId);
+      document.querySelectorAll('.fisik-item-select').forEach(el => el.classList.remove('selected', 'border-indigo-500'));
+      const activeEl = document.getElementById(`modal-fisik-${fisikId}`);
+      if(activeEl) activeEl.classList.add('selected', 'border-indigo-500');
+
+      const summary = document.getElementById('selectionSummary');
+      const diffQty = selectedFisik.jumlah - selectedNota.qty;
+      const vQty = document.getElementById('vSelectedQty');
+      const sTitle = document.getElementById('summaryTitle');
+      const sDesc = document.getElementById('summaryDesc');
+      const diffIcon = document.getElementById('diffIcon');
+
+      summary.classList.remove('hidden');
+      vQty.innerText = selectedFisik.jumlah;
+
+      if (diffQty === 0) {
+        diffIcon.className = "w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500 text-white shadow-md";
+        diffIcon.innerHTML = '<i class="fas fa-check"></i>';
+        sTitle.innerText = "Stok Sesuai";
+        sTitle.className = "text-xs font-black text-emerald-600";
+        sDesc.innerText = "Kuantitas fisik cocok dengan nota.";
+      } else {
+        const isMore = diffQty > 0;
+        diffIcon.className = `w-10 h-10 rounded-full flex items-center justify-center ${isMore ? 'bg-amber-500' : 'bg-red-500'} text-white shadow-md`;
+        diffIcon.innerHTML = isMore ? '<i class="fas fa-exclamation"></i>' : '<i class="fas fa-times"></i>';
+        sTitle.innerText = `Selisih ${isMore ? '+' : ''}${diffQty} Unit`;
+        sTitle.className = `text-xs font-black ${isMore ? 'text-amber-600' : 'text-red-600'}`;
+        sDesc.innerText = isMore ? "Terjadi kelebihan stok fisik." : "Stok gudang kurang.";
+      }
+
+      const btn = document.getElementById('btnAction');
+      btn.disabled = false;
+      btn.className = "flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg hover:bg-indigo-700 transition-all uppercase tracking-widest text-sm";
+      btn.innerText = "Simpan Verifikasi";
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modalVerify');
+      const content = document.getElementById('modalContent');
+      content.classList.remove('scale-100', 'opacity-100');
+      content.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    async function submitVerifikasi() {
+      const btn = document.getElementById('btnAction');
+      const syncStatus = document.getElementById('syncStatus');
+      
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-circle-notch animate-spin mr-2"></i> Mengirim ke Cloud...';
+      syncStatus.classList.remove('hidden');
+
+      const payload = {
+        action: "saveVerification",
+        notaId: selectedNota.uniqueId,
+        fisikId: String(selectedFisik.id),
+        namaItem: selectedNota.namaItem,
+        qtyNota: selectedNota.qty,
+        qtyFisik: selectedFisik.jumlah,
+        timestamp: new Date().toISOString(),
+        pelanggan: selectedNota.pelanggan
+      };
+
+      try {
+        // Kirim ke Google Apps Script via POST (CORS handled by Apps Script)
+        await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors', // Penting untuk Apps Script execution
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        // Update Lokal UI
+        verifiedPairs.push({
+          notaId: selectedNota.uniqueId,
+          fisikId: String(selectedFisik.id)
+        });
+        
+        localStorage.setItem('verified_nota_pairs', JSON.stringify(verifiedPairs));
+        
+        setTimeout(() => {
+            syncStatus.classList.add('hidden');
+            closeModal();
+            renderNota();
+            renderFisik();
+        }, 800);
+
+      } catch (e) {
+        console.error("Gagal sinkronisasi cloud", e);
+        btn.disabled = false;
+        btn.innerText = "Coba Lagi";
+        syncStatus.innerText = "Gagal Sinkron!";
+        syncStatus.className = "flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-bold";
+      }
+    }
+
+    async function fetchAllData() {
+      const icon = document.getElementById('refreshIcon');
+      if(icon) icon.classList.add('animate-spin');
+      
+      // Jalankan semua loading
+      await Promise.all([
+        loadVerifiedPairs(),
+        loadNota(), 
+        loadFisik()
+      ]);
+
+      if(icon) icon.classList.remove('animate-spin');
+    }
+
+    window.onload = fetchAllData;
+  </script>
+</body>
+</html>
