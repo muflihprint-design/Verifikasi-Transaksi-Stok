@@ -2,134 +2,202 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Muflih Print - Verifikasi Nota (Smart Match)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Muflih Print - Verifikasi Logistik</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+    
     body { 
       background: #f8fafc; 
-      font-family: 'Plus Jakarta Sans', sans-serif; 
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overscroll-behavior-y: contain;
     }
-    .nota-card.verified { opacity: 0.7; border-color: #10b981 !important; background-color: #f0fdf4; border-style: solid; }
-    .fisik-item-select.selected { border-color: #6366f1; background-color: #f5f3ff; }
-    .scroll-custom::-webkit-scrollbar { width: 6px; }
-    .scroll-custom::-webkit-scrollbar-track { background: transparent; }
-    .scroll-custom::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+    .nota-card.verified { 
+      opacity: 0.7; 
+      border-color: #10b981 !important; 
+      background-color: #f0fdf4; 
+    }
+
+    .nota-card.partial {
+      border-color: #f59e0b !important;
+      background-color: #fffbeb;
+    }
+
+    .nota-card.insufficient {
+      border-left: 4px solid #ef4444;
+    }
+
+    .fisik-item-select.selected { 
+      border-color: #6366f1; 
+      background-color: #f5f3ff; 
+    }
+
+    .tab-active { color: #4f46e5; }
+    .tab-active i { transform: translateY(-4px); transition: transform 0.2s ease; }
     .animate-in { animation: fadeIn 0.3s ease-out forwards; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    @keyframes fadeIn { 
+      from { opacity: 0; transform: translateY(10px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+
+    .content-area { padding-bottom: 90px; }
+
+    .stok-badge {
+        background: linear-gradient(135deg, #6366f1, #4338ca);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 800;
+    }
+    
+    .insufficient-badge {
+        background: #fee2e2;
+        color: #ef4444;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .partial-badge {
+        background: #fef3c7;
+        color: #d97706;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
   </style>
 </head>
 <body class="text-slate-900 min-h-screen">
 
+  <!-- Header -->
   <nav class="bg-white border-b sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-          <i class="fas fa-check-double text-lg"></i>
+        <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+          <i class="fas fa-layer-group text-sm"></i>
         </div>
         <div>
-          <h1 class="font-extrabold text-slate-800 tracking-tight leading-none uppercase">Verifikasi Logistik</h1>
-          <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sinkronisasi Cloud</p>
+          <h1 id="pageTitle" class="font-extrabold text-slate-800 text-sm uppercase tracking-tight">Nota Transaksi</h1>
+          <div id="syncStatus" class="hidden flex items-center gap-1 text-emerald-600 text-[8px] font-black uppercase">
+             <i class="fas fa-sync-alt animate-spin"></i> Memperbarui Data...
+          </div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-          <div id="syncStatus" class="hidden items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">
-              <i class="fas fa-sync-alt animate-spin"></i> Sinkronisasi...
-          </div>
-          <button onclick="fetchAllData()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition flex items-center gap-2">
-            <i id="refreshIcon" class="fas fa-sync-alt"></i> Segarkan
-          </button>
+      <button onclick="fetchAllData()" class="w-10 h-10 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center active:bg-indigo-100 transition-colors">
+        <i id="refreshIcon" class="fas fa-sync-alt"></i>
+      </button>
+    </div>
+
+    <div class="px-4 pb-3">
+      <div class="relative group">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <i class="fas fa-search text-slate-400 text-xs"></i>
+        </div>
+        <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Cari barang atau pelanggan..." 
+          class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
       </div>
     </div>
   </nav>
 
-  <main class="max-w-7xl mx-auto p-4 lg:p-6">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <section>
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="font-extrabold text-indigo-600 flex items-center gap-2 uppercase text-xs tracking-widest">
-            <i class="fas fa-file-invoice"></i> Item Transaksi Nota
-          </h2>
-          <span id="countNota" class="px-2 py-1 bg-indigo-100 text-indigo-600 text-[10px] font-black rounded-md uppercase">0 Item</span>
+  <!-- Main Content Area -->
+  <main class="content-area p-4">
+    
+    <!-- Halaman Nota -->
+    <div id="pageNota" class="space-y-3">
+        <div class="flex items-center justify-between px-1 mb-2">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antrean Verifikasi</span>
+            <span id="countNota" class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">0</span>
         </div>
-        <div id="containerNota" class="space-y-3 max-h-[75vh] overflow-y-auto scroll-custom pr-2">
-          <div class="text-center py-10 text-slate-400 text-xs animate-pulse">Memuat data nota...</div>
+        <div id="containerNota" class="space-y-3">
+            <div class="text-center py-20 text-slate-400 text-xs animate-pulse">Menghubungkan Database...</div>
         </div>
-      </section>
-
-      <section>
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="font-extrabold text-emerald-600 flex items-center gap-2 uppercase text-xs tracking-widest">
-            <i class="fas fa-history"></i> Log Gudang Tersedia
-          </h2>
-          <span id="countFisik" class="px-2 py-1 bg-emerald-100 text-emerald-600 text-[10px] font-black rounded-md uppercase">0 Log</span>
-        </div>
-        <div id="containerFisik" class="space-y-3 max-h-[75vh] overflow-y-auto scroll-custom pr-2">
-           <div class="text-center py-10 text-slate-400 text-xs animate-pulse">Memuat data gudang...</div>
-        </div>
-      </section>
     </div>
+
+    <!-- Halaman Gudang -->
+    <div id="pageGudang" class="hidden space-y-3">
+        <div class="flex items-center justify-between px-1 mb-2">
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Gudang (Aktif)</span>
+            <span id="countFisik" class="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">0</span>
+        </div>
+        <div id="containerFisik" class="space-y-3">
+            <div class="text-center py-20 text-slate-400 text-xs animate-pulse">Memindai Rak Gudang...</div>
+        </div>
+    </div>
+
   </main>
 
+  <!-- Bottom Navigation -->
+  <footer class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] flex justify-around items-center">
+    <button onclick="switchTab('nota')" id="tabNota" class="flex flex-col items-center gap-1 tab-active transition-all flex-1">
+      <i class="fas fa-file-invoice-dollar text-xl"></i>
+      <span class="text-[10px] font-extrabold uppercase tracking-tighter">Nota</span>
+    </button>
+    <div class="w-px h-6 bg-slate-100"></div>
+    <button onclick="switchTab('gudang')" id="tabGudang" class="flex flex-col items-center gap-1 text-slate-400 transition-all flex-1">
+      <i class="fas fa-box-open text-xl"></i>
+      <span class="text-[10px] font-extrabold uppercase tracking-tighter">Gudang</span>
+    </button>
+  </footer>
+
   <!-- Modal Verifikasi -->
-  <div id="modalVerify" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl transition-all scale-95 opacity-0 duration-300 flex flex-col max-h-[90vh]" id="modalContent">
-      <div class="p-6 border-b bg-slate-50 flex justify-between items-center">
-        <div>
-          <h3 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-            <i class="fas fa-shield-alt text-indigo-500"></i> Validasi Persediaan
-          </h3>
-          <p class="text-xs text-slate-500 font-medium">Hubungkan item nota dengan log fisik yang sesuai.</p>
-        </div>
-        <button onclick="closeModal()" class="w-10 h-10 rounded-full hover:bg-white flex items-center justify-center text-slate-400 transition-colors">
-          <i class="fas fa-times"></i>
-        </button>
+  <div id="modalVerify" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden flex flex-col justify-end">
+    <div class="bg-white w-full rounded-t-[32px] overflow-hidden shadow-2xl transition-all translate-y-full duration-300 flex flex-col max-h-[95vh]" id="modalContent">
+      
+      <div onclick="closeModal()" class="w-full flex justify-center py-3 cursor-pointer">
+          <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
       </div>
 
-      <div id="vNotaHeader" class="p-4 text-white flex justify-between items-center shadow-inner">
-        <div class="flex-1">
-          <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Item Nota</p>
-          <h4 id="vNotaName" class="text-lg font-black leading-tight truncate">...</h4>
-          <p id="vNotaDetail" class="text-[10px] opacity-80 mt-0.5 uppercase font-bold tracking-tighter">...</p>
-        </div>
-        <div class="text-right ml-4">
-          <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Target Qty</p>
-          <div class="text-3xl font-black"><span id="vNotaQty">0</span> <span class="text-sm font-bold opacity-60">pcs</span></div>
+      <div id="vNotaHeader" class="mx-4 p-5 rounded-2xl text-white shadow-lg">
+        <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">Verifikasi Item Nota</p>
+        <h4 id="vNotaName" class="text-lg font-black leading-tight mb-1 truncate">...</h4>
+        <div class="flex items-center gap-3">
+          <div class="text-2xl font-black"><span id="vNotaQty">0</span> <span class="text-xs opacity-60">pcs</span></div>
+          <div class="h-4 w-px bg-white/20"></div>
+          <p id="vNotaDetail" class="text-[10px] opacity-80 uppercase font-bold truncate">...</p>
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6 space-y-4 scroll-custom">
+      <div class="flex-1 overflow-y-auto p-5 space-y-4">
         <div class="flex items-center justify-between">
-            <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <i class="fas fa-search-location text-indigo-400"></i> Pilih Log Gudang yang Sesuai
-            </h5>
-            <span id="vTargetType" class="text-[9px] font-black px-2 py-1 rounded-md uppercase"></span>
+            <h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Log Gudang Tersedia</h5>
+            <span id="vTargetType" class="text-[8px] font-black px-2 py-0.5 rounded uppercase"></span>
         </div>
-        <div id="matchingFisikList" class="space-y-3"></div>
-        <div id="noMatchMsg" class="hidden text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed">
-          <i class="fas fa-box-open text-3xl text-slate-200 mb-3 block"></i>
-          <p class="text-sm font-bold text-slate-400">Log belum diinput atau sudah terpakai nota lain.</p>
+        
+        <div id="matchingFisikList" class="space-y-3 pb-4"></div>
+        
+        <div id="noMatchMsg" class="hidden text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed">
+          <i class="fas fa-ghost text-2xl text-slate-200 mb-2 block"></i>
+          <p class="text-xs font-bold text-slate-400">Tidak ada stok yang cocok.</p>
         </div>
       </div>
 
-      <div class="p-6 bg-slate-50 border-t">
-        <div id="selectionSummary" class="hidden mb-4 p-4 bg-white rounded-2xl border flex items-center justify-between shadow-sm">
+      <div class="p-5 bg-slate-50 border-t space-y-3 pb-8">
+        <div id="selectionSummary" class="hidden p-3 bg-white rounded-xl border flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div id="diffIcon" class="w-10 h-10 rounded-full flex items-center justify-center text-white"></div>
+                <div id="diffIcon" class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs"></div>
                 <div>
-                    <p id="summaryTitle" class="text-xs font-black text-slate-800">Item Terpilih</p>
-                    <p id="summaryDesc" class="text-[10px] text-slate-500 font-medium">Logistik vs Nota</p>
+                    <p id="summaryTitle" class="text-[10px] font-black"></p>
+                    <p id="summaryDesc" class="text-[9px] text-slate-400 font-medium"></p>
                 </div>
             </div>
-            <div id="vSelectedQty" class="text-xl font-black">0</div>
+            <div id="vSelectedQty" class="text-lg font-black">0</div>
         </div>
-        <div class="flex gap-3">
-          <button onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition">Batal</button>
-          <button id="btnAction" disabled onclick="submitVerifikasi()" class="flex-[2] py-4 bg-indigo-300 text-white font-black rounded-2xl transition-all cursor-not-allowed uppercase tracking-widest text-sm">Pilih Log Dahulu</button>
+
+        <div id="conditionalActions" class="hidden flex gap-2">
+            <button onclick="adjustAndSubmit('adjust')" class="flex-1 py-3 bg-white border border-amber-200 text-amber-600 font-bold rounded-xl text-[10px] uppercase">Gunakan Sisa Stok</button>
         </div>
+
+        <button id="btnAction" disabled onclick="submitVerifikasi()" class="w-full py-4 bg-slate-200 text-slate-400 font-black rounded-2xl transition-all uppercase tracking-widest text-sm">Pilih Stok</button>
       </div>
     </div>
   </div>
@@ -137,41 +205,67 @@
   <script>
     const CSV_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv`;
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPoXAbTJxZb8u53WTJNX4JHIET4QRL0e2sHEPLljRZaD4G5kAuwWNsJOJ69RAYYAZv/exec";
-    
     const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let listItemsNota = []; 
     let listFisik = [];
-    let verifiedPairs = []; 
+    let verifiedLogs = []; 
     let selectedNota = null;
     let selectedFisik = null;
+    let searchTerm = "";
 
-    /**
-     * Normalisasi ID untuk perbandingan yang lebih akurat
-     * Menghilangkan awalan N-, spasi, dan mengubah ke lowercase
-     */
-    function normalizeId(id) {
-      if (!id) return "";
-      return String(id).replace(/^N-/i, '').trim().toLowerCase();
+    function switchTab(tab) {
+      const pageNota = document.getElementById('pageNota');
+      const pageGudang = document.getElementById('pageGudang');
+      const tabNota = document.getElementById('tabNota');
+      const tabGudang = document.getElementById('tabGudang');
+      const pageTitle = document.getElementById('pageTitle');
+
+      if (tab === 'nota') {
+        pageNota.classList.remove('hidden');
+        pageGudang.classList.add('hidden');
+        tabNota.classList.add('tab-active');
+        tabNota.classList.remove('text-slate-400');
+        tabGudang.classList.remove('tab-active');
+        tabGudang.classList.add('text-slate-400');
+        pageTitle.innerText = "Nota Transaksi";
+      } else {
+        pageNota.classList.add('hidden');
+        pageGudang.classList.remove('hidden');
+        tabGudang.classList.add('tab-active');
+        tabGudang.classList.remove('text-slate-400');
+        tabNota.classList.remove('tab-active');
+        tabNota.classList.add('text-slate-400');
+        pageTitle.innerText = "Log Gudang";
+      }
     }
 
-    async function loadVerifiedPairs() {
+    function calculateRemainingStock(fisikId, initialQty) {
+        const usedAmount = verifiedLogs
+            .filter(log => String(log.fisikId) === String(fisikId))
+            .reduce((sum, log) => sum + parseInt(log.qtyNota || 0), 0);
+        return initialQty - usedAmount;
+    }
+
+    // Hitung berapa qty yang SUDAH diverifikasi untuk satu nota unik
+    function calculateVerifiedQtyForNota(notaId) {
+        return verifiedLogs
+            .filter(log => String(log.notaId) === String(notaId))
+            .reduce((sum, log) => sum + parseInt(log.qtyNota || 0), 0);
+    }
+
+    async function loadVerifiedLogs() {
       try {
         const res = await fetch(`${APPS_SCRIPT_URL}?action=getVerified`);
         const data = await res.json();
         if (Array.isArray(data)) {
-          verifiedPairs = data.map(p => ({
-            notaId: String(p.notaId || "").trim(),
-            fisikId: String(p.fisikId || "").trim()
-          }));
-          localStorage.setItem('verified_nota_pairs', JSON.stringify(verifiedPairs));
-          console.log("Cloud Verified Data Loaded:", verifiedPairs);
+            verifiedLogs = data;
+            localStorage.setItem('cached_verified_logs', JSON.stringify(data));
         }
       } catch (e) {
-        console.warn("Using Local Cache for Verified Data");
-        verifiedPairs = JSON.parse(localStorage.getItem('verified_nota_pairs') || '[]'); 
+        verifiedLogs = JSON.parse(localStorage.getItem('cached_verified_logs') || '[]'); 
       }
     }
 
@@ -203,17 +297,17 @@
                   listItemsNota.push({
                     uniqueId: `N-${idTrx}-${itemIdx}`,
                     idTrx: idTrx, tgl: tgl, pelanggan: pelanggan,
-                    namaItem: item.nama || "Tanpa Nama",
+                    namaItem: item.nama || "Item",
                     qty: parseInt(item.qty || 0),
                     kategori: kategori
                   });
                 });
               }
-            } catch (e) { console.error("JSON Error", e); }
+            } catch (e) {}
           }
         });
         renderNota();
-      } catch (e) { console.error("CSV Error", e); }
+      } catch (e) {}
     }
 
     async function loadFisik() {
@@ -222,35 +316,85 @@
         if(error) throw error;
         listFisik = data || [];
         renderFisik();
-      } catch (e) { console.error("Supabase Error", e); }
+      } catch (e) {}
+    }
+
+    function handleSearch() {
+      searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      renderNota();
+      renderFisik();
     }
 
     function renderNota() {
       const container = document.getElementById('containerNota');
-      document.getElementById('countNota').innerText = `${listItemsNota.length} Item`;
-      
-      // Buat map ID ternormalisasi untuk pengecekan cepat
-      const normalizedVerifiedIds = verifiedPairs.map(p => normalizeId(p.notaId));
 
-      container.innerHTML = listItemsNota.map(n => {
-        const currentNormalized = normalizeId(n.uniqueId);
-        const isVerified = normalizedVerifiedIds.includes(currentNormalized);
+      const filtered = listItemsNota.filter(n => 
+        n.namaItem.toLowerCase().includes(searchTerm) || 
+        n.pelanggan.toLowerCase().includes(searchTerm) ||
+        n.idTrx.toLowerCase().includes(searchTerm)
+      );
+
+      document.getElementById('countNota').innerText = filtered.length;
+
+      if(filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-20 text-slate-300 italic text-xs">Nota tidak ditemukan.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(n => {
+        const verifiedQty = calculateVerifiedQtyForNota(n.uniqueId);
+        const isFullyVerified = verifiedQty >= n.qty;
+        const isPartiallyVerified = verifiedQty > 0 && verifiedQty < n.qty;
+        const remainingToVerify = n.qty - verifiedQty;
         
+        // Hitung total ketersediaan stok fisik untuk item ini
+        const targetFisikType = n.kategori === 'Penjualan' ? 'Barang Keluar' : 'Barang Masuk';
+        const query = n.namaItem.toLowerCase().split(' ')[0];
+        const totalAvailable = listFisik
+            .filter(f => f.jenis === targetFisikType && (f.nama_barang.toLowerCase().includes(query) || n.namaItem.toLowerCase().includes(f.nama_barang.toLowerCase().split(' ')[0])))
+            .reduce((sum, f) => sum + calculateRemainingStock(f.id, f.jumlah), 0);
+        
+        const isInsufficient = !isFullyVerified && totalAvailable < remainingToVerify;
+        
+        let cardClass = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in active:scale-[0.98] transition-transform";
+        if (isFullyVerified) cardClass = "nota-card verified animate-in bg-white p-4 rounded-2xl border border-slate-100 shadow-sm";
+        else if (isPartiallyVerified) cardClass = "nota-card partial animate-in bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.98] transition-transform";
+        
+        if (isInsufficient) cardClass += " insufficient";
+
         return `
-          <div onclick="${isVerified ? '' : `openSmartVerify('${n.uniqueId}')`}" class="nota-card animate-in bg-white p-4 rounded-2xl border-2 border-transparent shadow-sm ${isVerified ? 'verified cursor-default' : 'cursor-pointer hover:border-indigo-200'} transition-all">
+          <div onclick="${isFullyVerified ? '' : `openSmartVerify('${n.uniqueId}')`}" class="${cardClass}">
             <div class="flex justify-between items-start mb-2">
-              <span class="text-[8px] px-2 py-0.5 rounded ${n.kategori === 'Penjualan' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} font-bold uppercase">${n.kategori}</span>
-              ${isVerified ? 
-                '<span class="flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase tracking-tighter"><i class="fas fa-check-circle"></i> Terverifikasi</span>' : 
-                `<span class="text-[9px] font-bold text-slate-400">${n.tgl}</span>`
+              <div class="flex gap-2 items-center flex-wrap">
+                <span class="text-[8px] px-2 py-0.5 rounded ${n.kategori === 'Penjualan' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} font-black uppercase tracking-widest">${n.kategori}</span>
+                ${isInsufficient ? '<span class="insufficient-badge">Stok Kurang</span>' : ''}
+                ${isPartiallyVerified ? '<span class="partial-badge">Belum Sesuai</span>' : ''}
+              </div>
+              ${isFullyVerified ? 
+                '<span class="text-[9px] font-black text-emerald-600 uppercase italic"><i class="fas fa-check-circle"></i> Selesai</span>' : 
+                `<span class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">${n.tgl}</span>`
               }
             </div>
-            <div class="font-extrabold text-slate-800 leading-tight">${n.namaItem}</div>
-            <div class="flex justify-between items-end mt-3">
-              <div class="text-[10px] font-bold text-slate-400 truncate w-2/3"><i class="fas fa-user mr-1"></i> ${n.pelanggan}</div>
-              <div class="text-xl font-black ${isVerified ? 'text-emerald-500' : 'text-indigo-600'}">${n.qty} <span class="text-[10px]">pcs</span></div>
+            <div class="font-extrabold text-slate-800 leading-tight text-sm">${n.namaItem}</div>
+            
+            ${isPartiallyVerified ? `
+                <div class="mt-2 flex items-center gap-2">
+                    <div class="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-amber-500" style="width: ${(verifiedQty / n.qty) * 100}%"></div>
+                    </div>
+                    <span class="text-[8px] font-black text-amber-600">${verifiedQty}/${n.qty}</span>
+                </div>
+            ` : ''}
+
+            <div class="flex justify-between items-center mt-3">
+              <div class="text-[9px] font-bold text-slate-400 truncate max-w-[150px] uppercase">${n.pelanggan}</div>
+              <div class="text-right">
+                ${isPartiallyVerified ? `<div class="text-[8px] font-bold text-slate-400 line-through">${n.qty} pcs</div>` : ''}
+                <div class="text-lg font-black ${isFullyVerified ? 'text-emerald-500' : (isPartiallyVerified ? 'text-amber-600' : (isInsufficient ? 'text-red-500' : 'text-indigo-600'))}">
+                    ${isPartiallyVerified ? remainingToVerify : n.qty} <span class="text-[9px]">pcs</span>
+                </div>
+              </div>
             </div>
-            ${!isVerified ? `<div class="mt-2 text-[7px] text-slate-300 font-mono opacity-50">${n.uniqueId}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -258,24 +402,36 @@
 
     function renderFisik() {
       const container = document.getElementById('containerFisik');
-      const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
-      const availableFisik = listFisik.filter(f => !usedFisikIds.includes(String(f.id)));
-
-      document.getElementById('countFisik').innerText = `${availableFisik.length} Log`;
       
-      if(availableFisik.length === 0) {
-        container.innerHTML = `<div class="text-center py-10 text-slate-300 italic text-xs">Semua riwayat gudang telah terverifikasi.</div>`;
+      const itemsWithStock = listFisik.map(f => ({
+          ...f,
+          sisa: calculateRemainingStock(f.id, f.jumlah)
+      })).filter(f => 
+        f.sisa > 0 && 
+        (f.nama_barang.toLowerCase().includes(searchTerm) || f.jenis.toLowerCase().includes(searchTerm))
+      );
+
+      document.getElementById('countFisik').innerText = itemsWithStock.length;
+      
+      if(itemsWithStock.length === 0) {
+        container.innerHTML = `<div class="text-center py-20 text-slate-300 italic text-xs">Semua stok gudang sudah teralokasi.</div>`;
         return;
       }
 
-      container.innerHTML = availableFisik.map(f => `
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm animate-in">
-          <div class="flex justify-between items-start mb-1 text-[9px] font-bold">
+      container.innerHTML = itemsWithStock.map(f => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in">
+          <div class="flex justify-between items-center mb-1 text-[8px] font-black uppercase tracking-widest">
             <span class="${f.jenis === 'Barang Masuk' ? 'text-emerald-500' : 'text-red-400'}">${f.jenis}</span>
-            <span class="text-slate-300">${new Date(f.created_at).toLocaleDateString()}</span>
+            <span class="text-slate-300">ID: #${f.id}</span>
           </div>
-          <div class="font-bold text-slate-700 text-sm truncate">${f.nama_barang}</div>
-          <div class="text-right font-black text-slate-500">${f.jumlah} pcs</div>
+          <div class="font-extrabold text-slate-700 text-sm truncate">${f.nama_barang}</div>
+          <div class="mt-3 flex justify-between items-end">
+             <div class="text-[8px] font-bold text-slate-300 uppercase italic">Input: ${new Date(f.created_at).toLocaleDateString()}</div>
+             <div class="flex items-center gap-2">
+                ${f.sisa < f.jumlah ? `<span class="text-[9px] text-slate-300 line-through font-bold">${f.jumlah}</span>` : ''}
+                <span class="stok-badge">${f.sisa} PCS</span>
+             </div>
+          </div>
         </div>
       `).join('');
     }
@@ -284,29 +440,29 @@
       selectedNota = listItemsNota.find(n => n.uniqueId === notaId);
       selectedFisik = null;
       
+      const verifiedQty = calculateVerifiedQtyForNota(selectedNota.uniqueId);
+      const remainingToVerify = selectedNota.qty - verifiedQty;
+      selectedNota.currentRemaining = remainingToVerify; // Simpan sisa yang harus dicover
+
       const header = document.getElementById('vNotaHeader');
       const targetTypeBadge = document.getElementById('vTargetType');
       const targetFisikType = selectedNota.kategori === 'Penjualan' ? 'Barang Keluar' : 'Barang Masuk';
 
-      if (selectedNota.kategori === 'Penjualan') {
-        header.style.backgroundColor = "#2563eb"; // Blue 600
-        targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-red-100 text-red-600";
-        targetTypeBadge.innerText = "Target: Barang Keluar";
-      } else {
-        header.style.backgroundColor = "#ea580c"; // Orange 600
-        targetTypeBadge.className = "text-[9px] font-black px-2 py-1 rounded-md uppercase bg-emerald-100 text-emerald-600";
-        targetTypeBadge.innerText = "Target: Barang Masuk";
-      }
+      header.style.backgroundColor = selectedNota.kategori === 'Penjualan' ? "#4f46e5" : "#f59e0b";
+      targetTypeBadge.className = `text-[8px] font-black px-2 py-0.5 rounded uppercase ${selectedNota.kategori === 'Penjualan' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`;
+      targetTypeBadge.innerText = `Target: ${targetFisikType}`;
 
       document.getElementById('vNotaName').innerText = selectedNota.namaItem;
-      document.getElementById('vNotaQty').innerText = selectedNota.qty;
-      document.getElementById('vNotaDetail').innerText = `${selectedNota.kategori} • TRX #${selectedNota.idTrx}`;
+      document.getElementById('vNotaQty').innerText = remainingToVerify;
+      document.getElementById('vNotaDetail').innerText = `${selectedNota.pelanggan} • #${selectedNota.idTrx} ${verifiedQty > 0 ? `(Diverifikasi: ${verifiedQty})` : ''}`;
       
-      const usedFisikIds = verifiedPairs.map(p => String(p.fisikId));
       const query = selectedNota.namaItem.toLowerCase().split(' ')[0]; 
       
-      const matches = listFisik.filter(f => 
-        !usedFisikIds.includes(String(f.id)) && 
+      const matches = listFisik.map(f => ({
+          ...f,
+          sisa: calculateRemainingStock(f.id, f.jumlah)
+      })).filter(f => 
+        f.sisa > 0 && 
         f.jenis === targetFisikType && (
           f.nama_barang.toLowerCase().includes(query) || 
           selectedNota.namaItem.toLowerCase().includes(f.nama_barang.toLowerCase().split(' ')[0])
@@ -317,27 +473,29 @@
       const noMatch = document.getElementById('noMatchMsg');
       const btn = document.getElementById('btnAction');
       const summary = document.getElementById('selectionSummary');
+      const condActions = document.getElementById('conditionalActions');
 
       summary.classList.add('hidden');
+      condActions.classList.add('hidden');
       btn.disabled = true;
-      btn.className = "flex-[2] py-4 bg-slate-100 text-slate-400 font-black rounded-2xl cursor-not-allowed uppercase tracking-widest text-sm";
-      btn.innerText = "Pilih Log Dahulu";
+      btn.className = "w-full py-4 bg-slate-100 text-slate-300 font-black rounded-2xl uppercase text-sm";
+      btn.innerText = "Pilih Stok Gudang";
 
       if (matches.length > 0) {
         noMatch.classList.add('hidden');
         listContainer.innerHTML = matches.map(f => `
-          <div onclick="selectFisikItem('${f.id}')" id="modal-fisik-${f.id}" class="fisik-item-select p-4 bg-white border-2 border-slate-100 rounded-2xl cursor-pointer hover:border-indigo-400 transition-all flex justify-between items-center group">
+          <div onclick="selectFisikItem('${f.id}', ${f.sisa})" id="modal-fisik-${f.id}" class="fisik-item-select p-4 bg-white border border-slate-100 rounded-2xl active:scale-[0.98] transition-all flex justify-between items-center group">
             <div class="flex-1 min-w-0 pr-4">
-               <div class="flex items-center gap-2 mb-1">
-                 <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${f.jenis === 'Barang Masuk' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}">${f.jenis}</span>
-                 <span class="text-[9px] font-bold text-slate-300">#${f.id}</span>
+               <div class="flex items-center gap-2 mb-0.5">
+                 <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">#${f.id}</span>
+                 ${f.sisa < f.jumlah ? '<span class="text-[7px] font-black text-amber-500 uppercase italic">Terpakai Sebagian</span>' : ''}
                </div>
-               <div class="font-extrabold text-slate-700 text-sm truncate group-hover:text-indigo-600">${f.nama_barang}</div>
-               <div class="text-[10px] text-slate-400 font-medium">${new Date(f.created_at).toLocaleDateString()}</div>
+               <div class="font-extrabold text-slate-700 text-sm truncate">${f.nama_barang}</div>
+               <div class="text-[9px] text-slate-400 font-bold">${new Date(f.created_at).toLocaleDateString()}</div>
             </div>
             <div class="text-right">
-                <div class="text-xl font-black text-slate-800">${f.jumlah}</div>
-                <div class="text-[9px] font-black text-slate-300 uppercase tracking-tighter">PCS</div>
+                <div class="text-xl font-black ${f.sisa < remainingToVerify ? 'text-red-500' : 'text-indigo-600'}">${f.sisa}</div>
+                <div class="text-[8px] font-black text-slate-300 uppercase">PCS SISA</div>
             </div>
           </div>
         `).join('');
@@ -349,54 +507,59 @@
       const modal = document.getElementById('modalVerify');
       const content = document.getElementById('modalContent');
       modal.classList.remove('hidden');
-      setTimeout(() => {
-        content.classList.remove('scale-95', 'opacity-0');
-        content.classList.add('scale-100', 'opacity-100');
-      }, 50);
+      setTimeout(() => content.classList.remove('translate-y-full'), 10);
     }
 
-    function selectFisikItem(fisikId) {
+    function selectFisikItem(fisikId, sisaStok) {
       selectedFisik = listFisik.find(f => f.id == fisikId);
-      document.querySelectorAll('.fisik-item-select').forEach(el => el.classList.remove('selected', 'border-indigo-500'));
+      selectedFisik.sisaReal = sisaStok; 
+
+      document.querySelectorAll('.fisik-item-select').forEach(el => el.classList.remove('selected', 'border-indigo-500', 'bg-indigo-50'));
       const activeEl = document.getElementById(`modal-fisik-${fisikId}`);
-      if(activeEl) activeEl.classList.add('selected', 'border-indigo-500');
+      if(activeEl) activeEl.classList.add('selected', 'border-indigo-500', 'bg-indigo-50');
 
       const summary = document.getElementById('selectionSummary');
-      const diffQty = selectedFisik.jumlah - selectedNota.qty;
+      const condActions = document.getElementById('conditionalActions');
+      const diffQty = sisaStok - selectedNota.currentRemaining;
+      
       const vQty = document.getElementById('vSelectedQty');
       const sTitle = document.getElementById('summaryTitle');
       const sDesc = document.getElementById('summaryDesc');
       const diffIcon = document.getElementById('diffIcon');
 
       summary.classList.remove('hidden');
-      vQty.innerText = selectedFisik.jumlah;
+      vQty.innerText = sisaStok;
 
-      if (diffQty === 0) {
-        diffIcon.className = "w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500 text-white shadow-md";
-        diffIcon.innerHTML = '<i class="fas fa-check"></i>';
-        sTitle.innerText = "Stok Sesuai";
-        sTitle.className = "text-xs font-black text-emerald-600";
-        sDesc.innerText = "Kuantitas fisik cocok dengan nota.";
+      if (diffQty < 0) {
+        condActions.classList.remove('hidden');
+        diffIcon.className = "w-8 h-8 rounded-full flex items-center justify-center bg-red-500 text-white shadow-sm";
+        diffIcon.innerHTML = '<i class="fas fa-exclamation"></i>';
+        sTitle.innerText = `Kurang ${Math.abs(diffQty)} pcs`;
+        sTitle.className = "text-[10px] font-black text-red-600";
+        sDesc.innerText = "Stok log ini tidak cukup untuk sisa nota.";
       } else {
-        const isMore = diffQty > 0;
-        diffIcon.className = `w-10 h-10 rounded-full flex items-center justify-center ${isMore ? 'bg-amber-500' : 'bg-red-500'} text-white shadow-md`;
-        diffIcon.innerHTML = isMore ? '<i class="fas fa-exclamation"></i>' : '<i class="fas fa-times"></i>';
-        sTitle.innerText = `Selisih ${isMore ? '+' : ''}${diffQty} Unit`;
-        sTitle.className = `text-xs font-black ${isMore ? 'text-amber-600' : 'text-red-600'}`;
-        sDesc.innerText = isMore ? "Terjadi kelebihan stok fisik." : "Stok gudang kurang.";
+        condActions.classList.add('hidden');
+        diffIcon.className = "w-8 h-8 rounded-full flex items-center justify-center bg-emerald-500 text-white shadow-sm";
+        diffIcon.innerHTML = '<i class="fas fa-check"></i>';
+        sTitle.innerText = "Stok Cukup";
+        sTitle.className = "text-[10px] font-black text-emerald-600";
+        sDesc.innerText = `Sisa setelah nota: ${diffQty} pcs`;
       }
 
       const btn = document.getElementById('btnAction');
       btn.disabled = false;
-      btn.className = "flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg hover:bg-indigo-700 transition-all uppercase tracking-widest text-sm";
-      btn.innerText = "Simpan Verifikasi";
+      btn.className = `w-full py-4 ${diffQty < 0 ? 'bg-amber-500' : 'bg-indigo-600'} text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all uppercase text-sm`;
+      btn.innerText = diffQty < 0 ? "Gunakan Sisa Yang Ada" : "Simpan Verifikasi";
+    }
+
+    function adjustAndSubmit(type) {
+      submitVerifikasi();
     }
 
     function closeModal() {
       const modal = document.getElementById('modalVerify');
       const content = document.getElementById('modalContent');
-      content.classList.remove('scale-100', 'opacity-100');
-      content.classList.add('scale-95', 'opacity-0');
+      content.classList.add('translate-y-full');
       setTimeout(() => modal.classList.add('hidden'), 300);
     }
 
@@ -405,15 +568,15 @@
       const syncStatus = document.getElementById('syncStatus');
       
       btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-circle-notch animate-spin mr-2"></i> Mengirim...';
+      btn.innerHTML = '<i class="fas fa-circle-notch animate-spin mr-2"></i> Mengunci Stok...';
       syncStatus.classList.remove('hidden');
 
       const payload = {
         notaId: String(selectedNota.uniqueId).trim(),
         fisikId: String(selectedFisik.id),
         namaItem: selectedNota.namaItem,
-        qtyNota: selectedNota.qty,
-        qtyFisik: selectedFisik.jumlah,
+        qtyNota: Math.min(selectedNota.currentRemaining, selectedFisik.sisaReal), 
+        qtyFisik: selectedFisik.jumlah, 
         pelanggan: selectedNota.pelanggan
       };
 
@@ -423,13 +586,8 @@
           body: JSON.stringify(payload) 
         });
 
-        // Update state lokal
-        verifiedPairs.push({
-          notaId: payload.notaId,
-          fisikId: payload.fisikId
-        });
-        
-        localStorage.setItem('verified_nota_pairs', JSON.stringify(verifiedPairs));
+        verifiedLogs.push(payload);
+        localStorage.setItem('cached_verified_logs', JSON.stringify(verifiedLogs));
         
         syncStatus.classList.add('hidden');
         closeModal();
@@ -437,27 +595,16 @@
         renderFisik();
 
       } catch (e) {
-        console.error("Cloud Sync Error", e);
         btn.disabled = false;
-        btn.innerText = "Coba Lagi";
-        syncStatus.innerText = "Gagal Sinkron!";
-        syncStatus.className = "flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-bold";
+        btn.innerText = "Gagal, Coba Lagi";
       }
     }
 
     async function fetchAllData() {
       const icon = document.getElementById('refreshIcon');
       if(icon) icon.classList.add('animate-spin');
-      
-      // Tahap 1: Muat data dari cloud
-      await loadVerifiedPairs();
-      
-      // Tahap 2: Muat data nota dan fisik
-      await Promise.all([
-        loadNota(), 
-        loadFisik()
-      ]);
-
+      await loadVerifiedLogs();
+      await Promise.all([ loadNota(), loadFisik() ]);
       if(icon) icon.classList.remove('animate-spin');
     }
 
