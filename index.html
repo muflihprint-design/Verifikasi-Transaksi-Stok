@@ -432,95 +432,98 @@
       document.getElementById('modalEdit').classList.add('hidden');
     }
 
-   async function submitStokKeluar() {
+ async function submitStokKeluar() {
   if (isSubmitting) return;
-  
-  const itemCards = document.querySelectorAll('.item-card');
-  const dataToShip = []; // Untuk Google Sheets
-  const invoiceNo = currentSelectedTransaction.invoice.trim();
-  const timestamp = new Date().toLocaleString('id-ID');
-  
-  let itemsToMark = [];
-  let itemsForSupabase = []; // Untuk Supabase
 
-  itemCards.forEach((card, index) => {
-    const input = document.getElementById(`input-qty-${index}`);
-    const itemName = currentSelectedTransaction.items[index].nama.trim();
+  const cards = document.querySelectorAll('.item-card');
+  const dataToShip = []; // Data untuk Google Sheets
+  const itemsForSupabase = []; // Data untuk Riwayat Supabase
+  const inv = currentSelectedTransaction.invoice.trim();
+  const timestampStr = new Date().toLocaleString('id-ID');
+
+  cards.forEach((card, idx) => {
     const status = card.dataset.status;
-    const qty = parseInt(input.value) || 0;
-    
     if (status !== 'none') {
-      const note = status === 'masuk' ? "MASUK RIWAYAT" : "DIABAIKAN";
-      
-      // Data untuk Google Sheets
-      dataToShip.push([timestamp, invoiceNo, itemName, qty, note]);
-      itemsToMark.push(itemName);
+      const qty = parseInt(document.getElementById(`input-qty-${idx}`).value) || 0;
+      const name = currentSelectedTransaction.items[idx].nama.trim();
+      const statusLabel = status === 'masuk' ? "MASUK" : "ABAIKAN";
 
-      // JIKA STATUS 'MASUK', siapkan data untuk Riwayat Supabase
+      // 1. Siapkan data untuk Google Sheets
+      dataToShip.push([timestampStr, inv, name, qty, statusLabel]);
+
+      // 2. Jika status "MASUK", siapkan data untuk Supabase
       if (status === 'masuk') {
         itemsForSupabase.push({
-          jenis: 'Barang Keluar', // Penjualan dihitung sebagai barang keluar
-          nama_barang: itemName.toUpperCase(),
+          jenis: 'Barang Keluar', // Penjualan dicatat sebagai barang keluar
+          nama_barang: name.toUpperCase(),
           jumlah: qty,
-          keterangan: `Penjualan: ${invoiceNo}`
+          keterangan: `Penjualan: ${inv}`
         });
       }
     }
   });
 
-  if (dataToShip.length === 0) {
-    showToast("Pilih status item terlebih dahulu", true);
-    return;
-  }
+  if (dataToShip.length === 0) return showToast("Pilih status item!", true);
 
-  setLoading(true);
+  isSubmitting = true;
+  showToast("Memproses data...");
+
   try {
-    // --- PROSES 1: INSERT KE SUPABASE RIWAYAT ---
+    // --- PROSES A: INSERT KE SUPABASE & POTONG STOK ---
     if (itemsForSupabase.length > 0) {
-      const { error: sbError } = await _supabase
+      // Masukkan ke tabel Riwayat
+      const { error: errorRiwayat } = await _supabase
         .from('riwayat')
         .insert(itemsForSupabase);
-      
-      if (sbError) throw new Error("Gagal simpan riwayat Supabase: " + sbError.message);
-      
-      // Update juga stok sisa di Supabase (Opsional: Jika ingin otomatis potong stok)
+
+      if (errorRiwayat) throw new Error("Gagal simpan riwayat Supabase");
+
+      // Update stok sisa di tabel Stok (looping per item)
       for (const item of itemsForSupabase) {
-        const { data: currentStok } = await _supabase
+        // Ambil stok saat ini
+        const { data: currentData } = await _supabase
           .from('stok')
           .select('sisa')
           .eq('nama', item.nama_barang)
           .maybeSingle();
-        
-        if (currentStok) {
-          const sisaBaru = currentStok.sisa - item.jumlah;
-          await _supabase.from('stok').update({ sisa: sisaBaru }).eq('nama', item.nama_barang);
+
+        if (currentData) {
+          const sisaBaru = currentData.sisa - item.jumlah;
+          await _supabase
+            .from('stok')
+            .update({ sisa: sisaBaru })
+            .eq('nama', item.nama_barang);
         }
       }
     }
 
-    // --- PROSES 2: KIRIM KE GOOGLE SHEETS ---
-    await fetch(SCRIPT_WEB_APP_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(dataToShip)
+    // --- PROSES B: KIRIM KE GOOGLE SHEETS ---
+    await fetch(SCRIPT_WEB_APP_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      body: JSON.stringify(dataToShip) 
+    });
+
+    // --- PROSES C: UPDATE UI ---
+    showToast("Berhasil simpan ke Riwayat & Spreadsheet!");
+    
+    // Tandai secara lokal agar UI Penjualan terupdate
+    itemsForSupabase.forEach(item => {
+      storedItemsLog.add(`${inv}|${item.nama_barang}`);
     });
     
-    // UI Update
-    itemsToMark.forEach(name => storedItemsLog.add(`${invoiceNo}|${name}`));
-    updateInvoiceStatusLocally(invoiceNo);
-    renderPenjualan(window.lastSalesData);
-    
-    // Refresh tab riwayat & stok agar data terbaru muncul jika user pindah tab
+    // Reset flags agar data di tab lain di-refresh saat dibuka
     dataLoaded.riwayat = false;
     dataLoaded.stok = false;
-
-    showToast("Berhasil simpan ke Riwayat & Spreadsheet.");
-    setLoading(false);
+    
     closeModal();
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Gagal mengirim data", true);
-    setLoading(false);
+    fetchPenjualanData(); // Refresh tabel penjualan
+
+  } catch (e) {
+    console.error(e);
+    showToast("Terjadi kesalahan: " + e.message, true);
+  } finally {
+    isSubmitting = false;
   }
 }
     // LOGIKA TAB RIWAYAT & STOK (SUPABASE)
