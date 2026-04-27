@@ -435,7 +435,7 @@
       document.getElementById('modalEdit').classList.add('hidden');
     }
 
- async function submitStokKeluar() {
+async function submitStokKeluar() {
   if (isSubmitting) return;
 
   const cards = document.querySelectorAll('.item-card');
@@ -457,7 +457,7 @@
       // 2. Jika status "MASUK", siapkan data untuk Supabase
       if (status === 'masuk') {
         itemsForSupabase.push({
-          jenis: 'Barang Keluar', // Penjualan dicatat sebagai barang keluar
+          jenis: 'Barang Keluar', 
           nama_barang: name.toUpperCase(),
           jumlah: qty,
           keterangan: `Penjualan: ${inv}`
@@ -491,11 +491,20 @@
           .maybeSingle();
 
         if (currentData) {
+          // Jika barang sudah ada, kurangi sisa stoknya
           const sisaBaru = currentData.sisa - item.jumlah;
           await _supabase
             .from('stok')
             .update({ sisa: sisaBaru })
             .eq('nama', item.nama_barang);
+        } else {
+          // JIKA STOK BELUM ADA: Tambahkan baris produk baru dengan nilai negatif
+          await _supabase
+            .from('stok')
+            .insert([{ 
+              nama: item.nama_barang, 
+              sisa: -item.jumlah 
+            }]);
         }
       }
     }
@@ -507,7 +516,8 @@
       body: JSON.stringify(dataToShip) 
     });
 
-    // --- PROSES C: UPDATE UI ---
+    // --- PROSES C: UPDATE UI (Tanpa Notifikasi Sukses) ---
+    hideToast(); // Sembunyikan toast "Memproses..."
 
     // Tandai secara lokal agar UI Penjualan terupdate
     itemsForSupabase.forEach(item => {
@@ -519,7 +529,7 @@
     dataLoaded.stok = false;
     
     closeModal();
-    fetchPenjualanData(); // Refresh tabel penjualan
+    fetchPenjualanData(); // Refresh tabel penjualan secara silent
 
   } catch (e) {
     console.error(e);
@@ -528,6 +538,7 @@
     isSubmitting = false;
   }
 }
+    
     // LOGIKA TAB RIWAYAT & STOK (SUPABASE)
     async function loadRiwayat() {
       const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false }).limit(50);
