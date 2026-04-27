@@ -467,9 +467,9 @@ async function submitStokKeluar() {
   });
 
   if (dataToShip.length === 0) return showToast("Pilih status item!", true);
-
+  closeModal();
   isSubmitting = true;
-  showToast("Memproses data...");
+   showToast("Memproses data...");
 
   try {
     // --- PROSES A: INSERT KE SUPABASE & POTONG STOK ---
@@ -528,7 +528,7 @@ async function submitStokKeluar() {
     dataLoaded.riwayat = false;
     dataLoaded.stok = false;
     
-    closeModal();
+   
     fetchPenjualanData(); // Refresh tabel penjualan secara silent
 
   } catch (e) {
