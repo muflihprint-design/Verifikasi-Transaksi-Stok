@@ -276,25 +276,51 @@ const itemsPerPage = 10; // Jumlah item per halaman
     }
 
 
+   function setFilterDate(type) {
+      const now = new Date();
+      const btns = { today: 'btnFilterToday', month: 'btnFilterMonth', all: 'btnFilterAll' };
+      Object.values(btns).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = "flex-1 bg-indigo-50 text-indigo-600 py-2 rounded-lg text-[10px] font-bold";
+      });
+      
+      if (type === 'today') {
+        const s = now.toISOString().split('T')[0];
+        document.getElementById('dateStart').value = s;
+        document.getElementById('dateEnd').value = s;
+      } else if (type === 'month') {
+        document.getElementById('dateStart').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        document.getElementById('dateEnd').value = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      } else {
+        document.getElementById('dateStart').value = ''; document.getElementById('dateEnd').value = '';
+      }
+      const activeBtn = document.getElementById(btns[type]);
+      if (activeBtn) activeBtn.className = "flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold";
+      filterRiwayat();
+    }
+
     function filterRiwayat() {
   const q = document.getElementById('searchRiwayat').value.toLowerCase();
   const s = document.getElementById('dateStart').value;
   const e = document.getElementById('dateEnd').value;
   
+  // 1. Filter data dari masterRiwayat
   filteredRiwayat = masterRiwayat.filter(item => {
     const tgl = item.created_at.split('T')[0];
     return item.nama_barang.toLowerCase().includes(q) && (!s || tgl >= s) && (!e || tgl <= e);
   });
   
-  currentPage = 1; 
+  currentPage = 1; // Reset ke halaman 1 setiap kali filter berubah
   updatePaginationView();
 }
+
 
 function updatePaginationView() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedItems = filteredRiwayat.slice(startIndex, endIndex);
   
+  // Tampilkan/Sembunyikan navigasi pagination
   const nav = document.getElementById('paginationRiwayat');
   if (filteredRiwayat.length > itemsPerPage) {
     nav.classList.remove('hidden');
