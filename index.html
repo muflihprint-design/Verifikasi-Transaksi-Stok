@@ -121,16 +121,33 @@
       </div>
     </div>
 
-    <div id="tab-riwayat" class="hidden space-y-4">
-      <div class="glass-card p-4 shadow-md">
-        <input type="text" id="searchRiwayat" onkeyup="filterRiwayat()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm mb-3" placeholder="Cari riwayat...">
-        <div class="flex gap-2">
-          <button onclick="setFilterDate('today')" id="btnFilterToday" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold">HARI INI</button>
-          <button onclick="setFilterDate('all')" id="btnFilterAll" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-[10px] font-bold">SEMUA</button>
-        </div>
-      </div>
-      <div id="listRiwayat" class="space-y-2"></div>
+<div id="tab-riwayat" class="hidden space-y-4">
+  <div class="glass-card p-4 shadow-md">
+    <input type="text" id="searchRiwayat" onkeyup="filterRiwayat()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm mb-3" placeholder="Cari riwayat...">
+    
+    <div class="flex gap-2 mb-3">
+      <input type="date" id="dateStart" onchange="filterRiwayat()" class="flex-1 p-2 bg-gray-50 border rounded-lg text-[10px]">
+      <input type="date" id="dateEnd" onchange="filterRiwayat()" class="flex-1 p-2 bg-gray-50 border rounded-lg text-[10px]">
     </div>
+
+    <div class="flex gap-2">
+      <button onclick="setFilterDate('today')" id="btnFilterToday" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold">HARI INI</button>
+      <button onclick="setFilterDate('all')" id="btnFilterAll" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-[10px] font-bold">SEMUA</button>
+    </div>
+  </div>
+
+  <div id="listRiwayat" class="space-y-2"></div>
+
+  <div id="paginationRiwayat" class="hidden flex justify-between items-center bg-white p-3 rounded-xl shadow-md mt-4">
+    <button id="btnPrev" onclick="changePage(-1)" class="p-2 text-indigo-600 disabled:text-gray-300">
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    <span id="pageIndicator" class="text-[10px] font-bold text-slate-500 uppercase"></span>
+    <button id="btnNext" onclick="changePage(1)" class="p-2 text-indigo-600 disabled:text-gray-300">
+      <i class="fas fa-chevron-right"></i>
+    </button>
+  </div>
+</div>
 
     <div id="tab-stok" class="hidden space-y-4">
       <div class="flex justify-between items-center">
@@ -205,6 +222,9 @@
     let processedInvoices = new Set(); 
     let storedItemsLog = new Set();
     let currentSelectedTransaction = null;
+    let filteredRiwayat = [];
+let currentPage = 1;
+const itemsPerPage = 10; // Jumlah item per halaman
 
     // FUNGSI NAVIGASI
     function showTab(name) {
@@ -253,6 +273,48 @@
       `;
       container.appendChild(div);
     }
+
+
+    function filterRiwayat() {
+  const q = document.getElementById('searchRiwayat').value.toLowerCase();
+  const s = document.getElementById('dateStart').value;
+  const e = document.getElementById('dateEnd').value;
+  
+  filteredRiwayat = masterRiwayat.filter(item => {
+    const tgl = item.created_at.split('T')[0];
+    return item.nama_barang.toLowerCase().includes(q) && (!s || tgl >= s) && (!e || tgl <= e);
+  });
+  
+  currentPage = 1; 
+  updatePaginationView();
+}
+
+function updatePaginationView() {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedItems = filteredRiwayat.slice(startIndex, endIndex);
+  
+  const nav = document.getElementById('paginationRiwayat');
+  if (filteredRiwayat.length > itemsPerPage) {
+    nav.classList.remove('hidden');
+    document.getElementById('pageIndicator').innerText = `Hal ${currentPage} / ${Math.ceil(filteredRiwayat.length / itemsPerPage)}`;
+    document.getElementById('btnPrev').disabled = currentPage === 1;
+    document.getElementById('btnNext').disabled = endIndex >= filteredRiwayat.length;
+  } else {
+    nav.classList.add('hidden');
+  }
+  
+  renderRiwayat(paginatedItems);
+}
+
+// Fungsi pembantu untuk pindah halaman
+function changePage(direction) {
+  currentPage += direction;
+  updatePaginationView();
+  window.scrollTo(0, 0); // Kembali ke atas saat pindah halaman
+}
+
+    
 
     document.getElementById('stokForm').onsubmit = async function(e) {
       e.preventDefault();
@@ -572,11 +634,12 @@ async function submitStokKeluar() {
     
     // LOGIKA TAB RIWAYAT & STOK (SUPABASE)
     async function loadRiwayat() {
-      const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false }).limit(50);
-      masterRiwayat = data || [];
-      renderRiwayat(masterRiwayat);
-      dataLoaded.riwayat = true;
-    }
+  const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false });
+  masterRiwayat = data || [];
+  filteredRiwayat = [...masterRiwayat]; // Inisialisasi data terfilter
+  updatePaginationView(); // Gunakan pagination view sebagai ganti renderRiwayat langsung
+  dataLoaded.riwayat = true;
+}
 
     function renderRiwayat(items) {
       const container = document.getElementById('listRiwayat');
