@@ -702,6 +702,10 @@ function filterTableStok() {
   }
 }
 
+     function updateProgress(percent) {
+      document.getElementById('topProgressBar').style.width = percent + '%';
+    }
+
     // UTILS
     function parseCSV(text) {
       return text.split(/\r?\n/).map(line => {
