@@ -242,19 +242,51 @@ const itemsPerPage = 10; // Jumlah item per halaman
       if (name === 'penjualan' && !dataLoaded.penjualan) fetchPenjualanData();
     }
 
-    // FUNGSI TOAST
-    function showToast(msg, isError = false) {
-      const toast = document.getElementById('statusToast');
-      const toastMsg = document.getElementById('toastMsg');
-      toastMsg.innerText = msg;
-      toast.classList.remove('-translate-y-24', 'bg-indigo-600', 'bg-red-600');
-      toast.classList.add('translate-y-0', isError ? 'bg-red-600' : 'bg-indigo-600');
-      if(isError) setTimeout(hideToast, 4000);
-    }
+    // --- FUNGSI UI & INDICATOR ---
 
-    function hideToast() {
-      document.getElementById('statusToast').classList.replace('translate-y-0', '-translate-y-24');
-    }
+function setProcessingState(isProcessing) {
+  const btn = document.getElementById('btnSubmitForm');
+  const iconSave = document.getElementById('iconSave');
+  const iconLoading = document.getElementById('iconLoading');
+  const btnText = document.getElementById('btnText');
+
+  if (isProcessing) {
+    btn.disabled = true;
+    iconSave.classList.add('hidden');
+    iconLoading.classList.remove('hidden');
+    btnText.innerText = "SEDANG MEMPROSES...";
+  } else {
+    btn.disabled = false;
+    iconSave.classList.remove('hidden');
+    iconLoading.classList.add('hidden');
+    btnText.innerText = "SIMPAN TRANSAKSI";
+  }
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('statusToast');
+  const toastMsg = document.getElementById('toastMsg');
+  const toastIcon = document.getElementById('toastIcon');
+  
+  toastMsg.innerText = msg;
+  toast.classList.remove('-translate-y-24');
+  toast.classList.add('translate-y-0');
+  
+  if(isError) {
+    toast.classList.remove('bg-indigo-600'); 
+    toast.classList.add('bg-red-600');
+    toastIcon.className = 'fas fa-exclamation-triangle'; // Ikon peringatan untuk error
+    setTimeout(() => hideToast(), 4000);
+  } else {
+    toast.classList.remove('bg-red-600'); 
+    toast.classList.add('bg-indigo-600');
+    toastIcon.className = 'fas fa-circle-notch animate-spin'; // Ikon loading untuk proses sukses/jalan
+  }
+}
+
+function hideToast() {
+  document.getElementById('statusToast').classList.replace('translate-y-0', '-translate-y-24');
+}
 
     // LOGIKA TAB INPUT
     function addItemRow() {
@@ -344,47 +376,97 @@ function changePage(direction) {
 
     
 
-    document.getElementById('stokForm').onsubmit = async function(e) {
-      e.preventDefault();
-      setProcessingState(true);
-      const rows = document.querySelectorAll('#itemContainer > div');
-      const ket = document.getElementById('inputKeterangan').value;
-      const jenis = document.getElementById('inputJenisGlobal').value;
+  document.getElementById('stokForm').onsubmit = async function(e) {
+  e.preventDefault();
+  
+  // Ambil data input
+  const rows = document.querySelectorAll('#itemContainer > div');
+  const ket = document.getElementById('inputKeterangan').value;
+  const jenis = document.getElementById('inputJenisGlobal').value;
 
-      try {
-        for (let row of rows) {
-          const nama = row.querySelector('[name="namaBarang"]').value.toUpperCase();
-          const qty = parseInt(row.querySelector('[name="jumlahBarang"]').value);
-          
-          // Update Supabase Stok
-          const { data: cur } = await _supabase.from('stok').select('sisa').eq('nama', nama).maybeSingle();
-          const change = (jenis === 'Barang Masuk') ? qty : -qty;
-          const newSisa = (cur ? cur.sisa : 0) + change;
+  // Validasi sederhana jika tidak ada barang yang diinput
+  if (rows.length === 0) {
+    showToast("Tambahkan minimal satu barang!", true);
+    return;
+  }
 
-          if (cur) await _supabase.from('stok').update({ sisa: newSisa }).eq('nama', nama);
-          else await _supabase.from('stok').insert([{ nama: nama, sisa: change }]);
+  // Aktifkan mode loading pada tombol dan tampilkan toast proses
+  setProcessingState(true);
+  showToast("Sedang menyimpan transaksi...");
 
-          // Insert Riwayat
-          await _supabase.from('riwayat').insert([{ jenis, nama_barang: nama, jumlah: qty, keterangan: ket }]);
-        }
-        showToast("Transaksi Berhasil Disimpan!");
-        document.getElementById('itemContainer').innerHTML = '';
-        addItemRow();
-        dataLoaded.stok = false;
-        dataLoaded.riwayat = false;
-      } catch (err) {
-        showToast("Error: " + err.message, true);
-      } finally {
-        setProcessingState(false);
+  try {
+    for (let row of rows) {
+      const nama = row.querySelector('[name="namaBarang"]').value.toUpperCase();
+      const qtyInput = row.querySelector('[name="jumlahBarang"]').value;
+      const qty = parseInt(qtyInput);
+
+      if (!nama || isNaN(qty)) continue; // Lewati jika ada baris kosong
+      
+      // 1. Ambil data stok saat ini dari Supabase
+      const { data: cur, error: fetchError } = await _supabase
+        .from('stok')
+        .select('sisa')
+        .eq('nama', nama)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      // 2. Kalkulasi perubahan stok
+      const change = (jenis === 'Barang Masuk') ? qty : -qty;
+      const newSisa = (cur ? cur.sisa : 0) + change;
+
+      // 3. Update atau Insert ke tabel 'stok'
+      if (cur) {
+        const { error: updateError } = await _supabase
+          .from('stok')
+          .update({ sisa: newSisa })
+          .eq('nama', nama);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await _supabase
+          .from('stok')
+          .insert([{ nama: nama, sisa: change }]);
+        if (insertError) throw insertError;
       }
-    };
 
-    function setProcessingState(proc) {
-      isProcessing = proc;
-      document.getElementById('btnSubmitForm').disabled = proc;
-      document.getElementById('iconSave').classList.toggle('hidden', proc);
-      document.getElementById('iconLoading').classList.toggle('hidden', !proc);
+      // 4. Catat ke tabel 'riwayat'
+      const { error: historyError } = await _supabase
+        .from('riwayat')
+        .insert([{ 
+          jenis: jenis, 
+          nama_barang: nama, 
+          jumlah: qty, 
+          keterangan: ket 
+        }]);
+      if (historyError) throw historyError;
     }
+
+    // --- BERHASIL ---
+    showToast("Transaksi Berhasil Disimpan!");
+    
+    // Reset form
+    document.getElementById('inputKeterangan').value = '';
+    document.getElementById('itemContainer').innerHTML = '';
+    addItemRow();
+    
+    // Tandai data perlu di-refresh saat tab dibuka
+    dataLoaded.stok = false;
+    dataLoaded.riwayat = false;
+
+    // Sembunyikan toast sukses setelah 2 detik
+    setTimeout(() => hideToast(), 2000);
+
+  } catch (err) {
+    // --- GAGAL ---
+    console.error("Error saving transaction:", err);
+    showToast("Gagal menyimpan: " + err.message, true);
+  } finally {
+    // Matikan mode loading tombol
+    setProcessingState(false);
+  }
+};
+
+
 
     // LOGIKA TAB PENJUALAN (FITUR BARU)
    async function fetchPenjualanData(isManual = false) {
