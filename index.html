@@ -338,7 +338,8 @@ function updatePaginationView() {
 function changePage(direction) {
   currentPage += direction;
   updatePaginationView();
-  window.scrollTo(0, 0); // Kembali ke atas saat pindah halaman
+  // Scroll kembali ke atas tab riwayat agar user tidak bingung
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
     
