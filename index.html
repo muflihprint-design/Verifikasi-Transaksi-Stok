@@ -19,8 +19,8 @@
     .item-card.status-abaikan { border-left-color: #ef4444; background: #fff1f2; opacity: 0.8; }
     .item-card.status-none { border-left-color: #cbd5e1; background: #f8fafc; }
     
-    .status-processed { background: #dcfce7; color: #15803d; }
-    .status-pending { background: #fef9c3; color: #854d0e; }
+    .status-processed { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .status-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
     
     .btn-status { width: 32px; height: 32px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.75rem; }
   </style>
@@ -71,8 +71,8 @@
     <div id="content-penjualan" class="p-4 md:p-6 hidden">
       <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 class="text-2xl font-bold text-slate-800">Daftar Transaksi Penjualan</h2>
-        <button onclick="fetchPenjualanData()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition">
-          <i class="fas fa-sync-alt mr-2" id="syncIconPenjualan"></i>Refresh Data
+        <button onclick="fetchPenjualanData()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition shadow-md">
+          <i class="fas fa-sync-alt mr-2" id="syncIconPenjualan"></i>Refresh & Sinkronisasi
         </button>
       </div>
 
@@ -132,12 +132,14 @@
   </div>
 
   <script>
-    const SHEET_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
-    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxbe8D9HCTD10N6bmEj6xi_G5fx7OHkz3-Fw02r6A7W3rnSpipJn23BS8a29_pwMKAdnw/exec"; 
+    const SHEET_SALES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
+    
+    // Updated Script URL
+    const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEY6Pazj1Vur4LboaIdAgR8LRYJqQ8e4QQGiBElyQrYxxMMTdIZaUTkwCzbwtEiRJNjA/exec"; 
 
     let currentSelectedTransaction = null;
     let processedInvoices = new Set(); 
-    let storedItemsLog = new Set(); 
+    let storedItemsLog = new Set(); // Format: "Invoice|NamaProduk"
     let isSubmitting = false;
 
     function switchTab(tab) {
@@ -175,8 +177,8 @@
 
         if (filteredItems.length === 0) {
           itemsList.innerHTML = `<div class="text-center py-10">
-            <i class="fas fa-check-circle text-emerald-500 text-4xl mb-3"></i>
-            <p class="text-slate-500 text-sm">Semua item dalam transaksi ini sudah berhasil disimpan ke Spreadsheet.</p>
+            <i class="fas fa-check-double text-emerald-500 text-4xl mb-3"></i>
+            <p class="text-slate-500 text-sm font-medium">Semua item sudah tercatat di Spreadsheet.</p>
           </div>`;
           document.getElementById('btnSubmitModal').classList.add('hidden');
         } else {
@@ -191,18 +193,18 @@
               <div class="flex justify-between items-start mb-3">
                 <div class="flex flex-col">
                   <span class="font-bold text-slate-800 text-sm">${item.nama}</span>
-                  <span class="text-[10px] text-slate-500">Order: <span class="font-bold">${item.qty}</span></span>
+                  <span class="text-[10px] text-slate-500">Tagihan: <span class="font-bold">${item.qty}</span></span>
                 </div>
                 <div class="flex gap-2">
-                   <button onclick="setItemStatus(${index}, 'masuk')" id="btn-masuk-${index}" title="Simpan ke Sheet (Gunakan Stok)"
+                   <button onclick="setItemStatus(${index}, 'masuk')" id="btn-masuk-${index}" title="Simpan sebagai Stok Keluar"
                       class="btn-status bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600">
                       <i class="fas fa-check"></i>
                    </button>
-                   <button onclick="setItemStatus(${index}, 'abaikan')" id="btn-abaikan-${index}" title="Simpan ke Sheet (Abaikan/Tanpa Kurangi Stok)"
+                   <button onclick="setItemStatus(${index}, 'abaikan')" id="btn-abaikan-${index}" title="Simpan sebagai Diabaikan"
                       class="btn-status bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600">
                       <i class="fas fa-times"></i>
                    </button>
-                   <button onclick="setItemStatus(${index}, 'none')" id="btn-none-${index}" title="Belum Diputuskan"
+                   <button onclick="setItemStatus(${index}, 'none')" id="btn-none-${index}"
                       class="btn-status bg-slate-200 text-slate-600 ring-2 ring-slate-400">
                       <i class="fas fa-minus"></i>
                    </button>
@@ -210,16 +212,15 @@
               </div>
               <div class="flex items-center gap-3">
                 <label class="text-[10px] text-slate-500 font-semibold uppercase">Qty Keluar:</label>
-                <input type="number" value="${item.qty}" min="1" data-index="${index}" id="input-qty-${index}"
-                  class="qty-input w-20 px-2 py-1 border-2 border-slate-200 rounded focus:border-indigo-500 outline-none font-bold text-slate-700 text-sm">
+                <input type="number" value="${item.qty}" min="1" id="input-qty-${index}"
+                  class="w-20 px-2 py-1 border-2 border-slate-200 rounded focus:border-indigo-500 outline-none font-bold text-slate-700 text-sm">
               </div>
             `;
             itemsList.appendChild(itemDiv);
           });
         }
-
       } catch (e) {
-        itemsList.innerHTML = `<p class="text-red-500 text-sm">Data transaksi tidak valid.</p>`;
+        itemsList.innerHTML = `<p class="text-red-500 text-sm">Kesalahan memuat detail.</p>`;
       }
 
       modal.classList.remove('hidden');
@@ -245,21 +246,16 @@
 
       if (status === 'masuk') {
         card.classList.add('status-masuk');
-        btnMasuk.classList.remove('bg-slate-100', 'text-slate-400');
         btnMasuk.classList.add('bg-emerald-100', 'text-emerald-600', 'ring-2', 'ring-emerald-500');
         input.disabled = false;
-        input.classList.replace('text-slate-700', 'text-emerald-600');
       } else if (status === 'abaikan') {
         card.classList.add('status-abaikan');
-        btnAbaikan.classList.remove('bg-slate-100', 'text-slate-400');
         btnAbaikan.classList.add('bg-red-100', 'text-red-600', 'ring-2', 'ring-red-500');
         input.disabled = true;
       } else {
         card.classList.add('status-none');
-        btnNone.classList.remove('bg-slate-100', 'text-slate-400');
         btnNone.classList.add('bg-slate-200', 'text-slate-600', 'ring-2', 'ring-slate-400');
         input.disabled = false;
-        input.classList.replace('text-emerald-600', 'text-slate-700');
       }
     }
 
@@ -281,94 +277,108 @@
       const invoiceNo = currentSelectedTransaction.invoice;
       const timestamp = new Date().toLocaleString('id-ID');
       
-      let markedCount = 0;
-      let itemsProcessedNow = [];
+      let itemsToMark = [];
 
       itemCards.forEach((card, index) => {
         const input = document.getElementById(`input-qty-${index}`);
         const itemName = currentSelectedTransaction.items[index].nama;
-        const currentStatus = card.dataset.status;
+        const status = card.dataset.status;
         
-        if (currentStatus !== 'none') {
-            markedCount++;
+        if (status !== 'none') {
             const qty = parseInt(input.value) || 0;
-            
-            if (currentStatus === 'masuk') {
-                dataToShip.push([timestamp, invoiceNo, itemName, qty, "MASUK RIWAYAT"]);
-            } else if (currentStatus === 'abaikan') {
-                // Item diabaikan tetap dikirim ke spreadsheet dengan keterangan khusus
-                dataToShip.push([timestamp, invoiceNo, itemName, qty, "DIABAIKAN"]);
-            }
-            itemsProcessedNow.push(itemName);
+            const note = status === 'masuk' ? "MASUK RIWAYAT" : "DIABAIKAN";
+            dataToShip.push([timestamp, invoiceNo, itemName, qty, note]);
+            itemsToMark.push(itemName);
         }
       });
 
-      if (markedCount === 0) {
-        showToast("Mohon tandai minimal satu item (Centang atau Silang)", true);
+      if (dataToShip.length === 0) {
+        showToast("Pilih status item terlebih dahulu", true);
         return;
       }
 
       setLoading(true);
-
       try {
         await fetch(SCRIPT_WEB_APP_URL, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dataToShip)
         });
         
-        // Simpan ke log lokal agar tidak muncul lagi di modal
-        itemsProcessedNow.forEach(name => storedItemsLog.add(`${invoiceNo}|${name}`));
-        
-        // Cek apakah semua item dari invoice asli sudah diproses
-        const originalRow = window.lastSalesData.find(r => r[0] === invoiceNo);
-        if (originalRow) {
-          try {
-            const originalItems = JSON.parse(originalRow[10]);
-            const allDone = originalItems.every(it => storedItemsLog.has(`${invoiceNo}|${it.nama}`));
-            if (allDone) processedInvoices.add(invoiceNo);
-          } catch(e) {}
-        }
-
+        itemsToMark.forEach(name => storedItemsLog.add(`${invoiceNo}|${name}`));
+        updateInvoiceStatusLocally(invoiceNo);
         renderPenjualan(window.lastSalesData);
-        showToast(`Berhasil menyimpan ${dataToShip.length} data ke Spreadsheet.`);
+        showToast("Berhasil terkirim ke Spreadsheet.");
         setLoading(false);
         closeModal();
       } catch (err) {
-        showToast("Gagal menyimpan data", true);
+        showToast("Gagal mengirim data", true);
         setLoading(false);
       }
+    }
+
+    function updateInvoiceStatusLocally(invoice) {
+        const rowData = window.lastSalesData.find(r => r[0] === invoice);
+        if (rowData) {
+            try {
+                const items = JSON.parse(rowData[10]);
+                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama}`));
+                if (isAllDone) processedInvoices.add(invoice);
+            } catch(e) {}
+        }
     }
 
     function setLoading(loading) {
       isSubmitting = loading;
       const btn = document.getElementById('btnSubmitModal');
-      if (loading) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner animate-spin mr-2"></i> Menyimpan...';
-      } else {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Item Terpilih';
-      }
+      btn.disabled = loading;
+      btn.innerHTML = loading ? '<i class="fas fa-spinner animate-spin mr-2"></i> Mengirim...' : '<i class="fas fa-save mr-2"></i> Simpan Item Terpilih';
     }
 
     async function fetchPenjualanData() {
       const icon = document.getElementById('syncIconPenjualan');
       const body = document.getElementById('penjualanBody');
       icon.classList.add('animate-spin');
-      body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Mengambil data penjualan...</td></tr>`;
+      body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Membaca data dari Backend...</td></tr>`;
 
       try {
-        const response = await fetch(SHEET_READ_URL);
-        const csvText = await response.text();
-        const rows = parseCSV(csvText);
+        // Fetch history via doGet from the new Web App URL
+        const histRes = await fetch(SCRIPT_WEB_APP_URL + "?action=getHistory&cache=" + Date.now());
+        const historyData = await histRes.json();
+        
+        storedItemsLog.clear();
+        historyData.forEach(row => {
+          // Expecting format: [Timestamp, Invoice, Product, Qty, Note]
+          if (row[1] && row[2]) {
+            storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`);
+          }
+        });
+
+        // Fetch sales data via CSV
+        const salesRes = await fetch(SHEET_SALES_URL + "&cache=" + Date.now());
+        const salesCsv = await salesRes.text();
+        const rows = parseCSV(salesCsv);
+        
         window.lastSalesData = rows.slice(1).filter(row => row[3] && row[3].trim().toLowerCase() === 'penjualan');
         
+        processedInvoices.clear();
+        window.lastSalesData.forEach(row => {
+            const invoice = row[0];
+            try {
+                const items = JSON.parse(row[10]);
+                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama}`));
+                if (isAllDone) {
+                    processedInvoices.add(invoice);
+                }
+            } catch(e) {}
+        });
+
         renderPenjualan(window.lastSalesData);
         window.penjualanLoaded = true;
+        showToast("Sinkronisasi Selesai");
       } catch (err) {
-        showToast("Gagal mengambil data", true);
+        console.error("Fetch Error:", err);
+        showToast("Gagal mengambil data dari Backend", true);
       } finally {
         icon.classList.remove('animate-spin');
       }
@@ -394,7 +404,7 @@
     function renderPenjualan(data) {
       const body = document.getElementById('penjualanBody');
       if (data.length === 0) {
-        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Tidak ada data.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Data kosong.</td></tr>`;
         return;
       }
       
@@ -405,13 +415,14 @@
 
         return `
           <tr onclick='openModalWithTransaction("${invoice}", ${JSON.stringify(jsonDetail).replace(/'/g, "&apos;")})' 
-              class="hover:bg-indigo-50 cursor-pointer transition border-b border-slate-50 group ${isProcessed ? 'bg-slate-50/50 opacity-80' : ''}">
-            <td class="px-4 py-4 text-sm whitespace-nowrap">${row[1]}</td>
+              class="hover:bg-indigo-50 cursor-pointer transition border-b border-slate-50 group ${isProcessed ? 'bg-emerald-50/20' : ''}">
+            <td class="px-4 py-4 text-xs whitespace-nowrap">${row[1]}</td>
             <td class="px-4 py-4 font-mono text-xs text-indigo-600 font-bold">${invoice}</td>
-            <td class="px-4 py-4 text-sm">${parseDetail(invoice, jsonDetail)}</td>
+            <td class="px-4 py-4 text-sm">${renderItemBadges(invoice, jsonDetail)}</td>
             <td class="px-4 py-4 text-center">
-              <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase ${isProcessed ? 'status-processed' : 'status-pending'}">
-                ${isProcessed ? '<i class="fas fa-check-circle mr-1"></i>Selesai' : '<i class="fas fa-clock mr-1"></i>Antrean'}
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold shadow-sm ${isProcessed ? 'status-processed' : 'status-pending'}">
+                <i class="fas ${isProcessed ? 'fa-check-double mr-1' : 'fa-clock mr-1'}"></i>
+                ${isProcessed ? 'SELESAI' : 'BELUM'}
               </span>
             </td>
           </tr>
@@ -419,17 +430,18 @@
       }).join('');
     }
 
-    function parseDetail(invoice, json) {
+    function renderItemBadges(invoice, json) {
       try {
         const items = JSON.parse(json);
         return items.map(i => {
           const isDone = storedItemsLog.has(`${invoice}|${i.nama}`);
-          return `<div class="mb-1 text-xs ${isDone ? 'line-through text-slate-400' : ''}">
-            <span class="font-semibold">${i.nama}</span> (${i.qty}) 
-            ${isDone ? '<i class="fas fa-check ml-1 text-emerald-500"></i>' : ''}
+          return `<div class="flex items-center gap-2 text-[11px] mb-1 ${isDone ? 'text-emerald-700' : 'text-slate-500'}">
+            <span class="w-3 flex justify-center">${isDone ? '<i class="fas fa-check-circle"></i>' : '<i class="far fa-circle text-slate-300"></i>'}</span>
+            <span class="${isDone ? 'line-through opacity-60' : ''}">${i.nama}</span>
+            <span class="font-bold">(${i.qty})</span>
           </div>`;
         }).join('');
-      } catch (e) { return `<span class="text-slate-400 italic">Data tidak valid</span>`; }
+      } catch (e) { return `<span class="text-red-400 text-xs italic">JSON Error</span>`; }
     }
 
     function filterTableStok() {
@@ -442,18 +454,9 @@
     }
 
     window.onload = () => {
-      const stokBody = document.getElementById('stokBody');
-      const mockData = [
-        { name: "Kertas F4 70gr", stock: 120, updated: "Baru saja" },
-        { name: "Tinta Epson 003 Black", stock: 15, updated: "1 jam lalu" }
-      ];
-      stokBody.innerHTML = mockData.map(item => `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="px-4 py-4 font-medium text-slate-800">${item.name}</td>
-          <td class="px-4 py-4 font-bold text-indigo-600">${item.stock}</td>
-          <td class="px-4 py-4 text-xs text-slate-400">${item.updated}</td>
-        </tr>
-      `).join('');
+      document.getElementById('stokBody').innerHTML = `
+        <tr class="hover:bg-slate-50"><td class="px-4 py-4">Kertas F4 70gr</td><td class="px-4 py-4">100</td><td class="px-4 py-4 text-xs italic text-slate-400">Database Aktif</td></tr>
+      `;
     };
   </script>
 </body>
