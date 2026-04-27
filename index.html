@@ -753,6 +753,16 @@ async function submitStokKeluar() {
 
     function renderRiwayat(items) {
       const container = document.getElementById('listRiwayat');
+
+      if (items.length === 0) {
+    container.innerHTML = `
+      <div class="glass-card p-8 text-center text-slate-400 italic text-sm">
+        <i class="fas fa-search mb-2 text-2xl block opacity-20"></i>
+        Tidak ada data riwayat ditemukan
+      </div>`;
+    return;
+  }
+      
       container.innerHTML = items.map(row => `
         <div class="glass-card p-3 text-sm border-l-4 ${row.jenis === 'Barang Masuk' ? 'border-green-500' : 'border-red-500'}">
           <div class="flex justify-between text-[10px] font-bold mb-1">
@@ -774,6 +784,19 @@ async function submitStokKeluar() {
       const tbody = document.getElementById('tableStok');
       const dl = document.getElementById('produkList');
       tbody.innerHTML = ''; dl.innerHTML = '';
+
+      if (!data || data.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="2" class="px-4 py-10 text-center text-slate-400 italic text-sm">
+          <i class="fas fa-box-open mb-2 text-2xl block opacity-20"></i>
+          Belum ada data stok tersedia.
+        </td>
+      </tr>`;
+    dataLoaded.stok = true;
+    return;
+  }
+      
       data.forEach(item => {
         tbody.innerHTML += `<tr class="hover:bg-slate-50"><td class="px-4 py-4 text-sm font-medium">${item.nama}</td><td class="px-4 py-4 text-right font-bold">${item.sisa}</td></tr>`;
         dl.innerHTML += `<option value="${item.nama}">`;
@@ -872,6 +895,16 @@ function filterTableStok() {
         tr[i].style.display = "none";
       }
     }
+  }
+
+  if (visibleCount === 0) {
+    const noDataRow = document.createElement("tr");
+    noDataRow.id = "no-data-stok";
+    noDataRow.innerHTML = `
+      <td colspan="2" class="px-4 py-8 text-center text-slate-400 italic text-sm">
+        Barang "${input.value}" tidak ditemukan.
+      </td>`;
+    tbody.appendChild(noDataRow);
   }
 }
 
