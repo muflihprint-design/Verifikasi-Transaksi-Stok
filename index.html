@@ -170,8 +170,8 @@
       
       try {
         const items = JSON.parse(jsonStr);
-        // Cek log item (apakah sudah diproses masuk riwayat ATAU diabaikan sebelumnya)
-        const filteredItems = items.filter(item => !storedItemsLog.has(`${invoice}|${item.nama}`));
+        // Memastikan normalisasi nama produk saat pengecekan
+        const filteredItems = items.filter(item => !storedItemsLog.has(`${invoice.trim()}|${item.nama.trim()}`));
         
         currentSelectedTransaction = { invoice, items: filteredItems };
 
@@ -274,14 +274,14 @@
       
       const itemCards = document.querySelectorAll('.item-card');
       const dataToShip = [];
-      const invoiceNo = currentSelectedTransaction.invoice;
+      const invoiceNo = currentSelectedTransaction.invoice.trim();
       const timestamp = new Date().toLocaleString('id-ID');
       
       let itemsToMark = [];
 
       itemCards.forEach((card, index) => {
         const input = document.getElementById(`input-qty-${index}`);
-        const itemName = currentSelectedTransaction.items[index].nama;
+        const itemName = currentSelectedTransaction.items[index].nama.trim();
         const status = card.dataset.status;
         
         if (status !== 'none') {
@@ -318,12 +318,12 @@
     }
 
     function updateInvoiceStatusLocally(invoice) {
-        const rowData = window.lastSalesData.find(r => r[0] === invoice);
+        const rowData = window.lastSalesData.find(r => r[0].trim() === invoice.trim());
         if (rowData) {
             try {
                 const items = JSON.parse(rowData[10]);
-                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama}`));
-                if (isAllDone) processedInvoices.add(invoice);
+                const isAllDone = items.every(i => storedItemsLog.has(`${invoice.trim()}|${i.nama.trim()}`));
+                if (isAllDone) processedInvoices.add(invoice.trim());
             } catch(e) {}
         }
     }
@@ -349,7 +349,7 @@
         historyData.forEach(row => {
           // row[1] adalah Invoice, row[2] adalah Produk
           if (row[1] && row[2]) {
-            storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`);
+            storedItemsLog.add(`${row[1].toString().trim()}|${row[2].toString().trim()}`);
           }
         });
 
@@ -361,11 +361,11 @@
         
         processedInvoices.clear();
         window.lastSalesData.forEach(row => {
-            const invoice = row[0];
+            const invoice = row[0].trim();
             try {
                 const items = JSON.parse(row[10]);
-                // Logika: Invoice SELESAI jika setiap item di dalamnya ada di storedItemsLog (baik Masuk maupun Abaikan)
-                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama}`));
+                // Logika: Invoice SELESAI jika setiap item di dalamnya ada di storedItemsLog (baik MASUK RIWAYAT maupun DIABAIKAN)
+                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama.trim()}`));
                 if (isAllDone) {
                     processedInvoices.add(invoice);
                 }
@@ -408,7 +408,7 @@
       }
       
       body.innerHTML = data.map(row => {
-        const invoice = row[0];
+        const invoice = row[0].trim();
         const jsonDetail = row[10];
         const isProcessed = processedInvoices.has(invoice);
 
@@ -433,7 +433,7 @@
       try {
         const items = JSON.parse(json);
         return items.map(i => {
-          const isDone = storedItemsLog.has(`${invoice}|${i.nama}`);
+          const isDone = storedItemsLog.has(`${invoice.trim()}|${i.nama.trim()}`);
           return `<div class="flex items-center gap-2 text-[11px] mb-1 ${isDone ? 'text-emerald-700' : 'text-slate-500'}">
             <span class="w-3 flex justify-center">${isDone ? '<i class="fas fa-check-circle"></i>' : '<i class="far fa-circle text-slate-300"></i>'}</span>
             <span class="${isDone ? 'line-through opacity-60' : ''}">${i.nama}</span>
@@ -454,7 +454,7 @@
 
     window.onload = () => {
       document.getElementById('stokBody').innerHTML = `
-        <tr class="hover:bg-slate-50"><td class="px-4 py-4">Kertas F4 70gr</td><td class="px-4 py-4">100</td><td class="px-4 py-4 text-xs italic text-slate-400">Database Aktif</td></tr>
+        <tr class="hover:bg-slate-50"><td class="px-4 py-4">Database sedang disinkronkan...</td><td class="px-4 py-4">-</td><td class="px-4 py-4 text-xs italic text-slate-400">Silakan ke tab Penjualan</td></tr>
       `;
     };
   </script>
