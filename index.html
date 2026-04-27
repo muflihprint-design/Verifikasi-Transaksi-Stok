@@ -432,37 +432,97 @@
       document.getElementById('modalEdit').classList.add('hidden');
     }
 
-    async function submitStokKeluar() {
-      if (isSubmitting) return;
-      const cards = document.querySelectorAll('.item-card');
-      const dataToShip = [];
-      const inv = currentSelectedTransaction.invoice.trim();
+   async function submitStokKeluar() {
+  if (isSubmitting) return;
+  
+  const itemCards = document.querySelectorAll('.item-card');
+  const dataToShip = []; // Untuk Google Sheets
+  const invoiceNo = currentSelectedTransaction.invoice.trim();
+  const timestamp = new Date().toLocaleString('id-ID');
+  
+  let itemsToMark = [];
+  let itemsForSupabase = []; // Untuk Supabase
+
+  itemCards.forEach((card, index) => {
+    const input = document.getElementById(`input-qty-${index}`);
+    const itemName = currentSelectedTransaction.items[index].nama.trim();
+    const status = card.dataset.status;
+    const qty = parseInt(input.value) || 0;
+    
+    if (status !== 'none') {
+      const note = status === 'masuk' ? "MASUK RIWAYAT" : "DIABAIKAN";
       
-      cards.forEach((card, idx) => {
-        const status = card.dataset.status;
-        if (status !== 'none') {
-          const qty = document.getElementById(`input-qty-${idx}`).value;
-          const name = currentSelectedTransaction.items[idx].nama;
-          dataToShip.push([new Date().toLocaleString('id-ID'), inv, name, qty, status === 'masuk' ? "MASUK" : "ABAIKAN"]);
+      // Data untuk Google Sheets
+      dataToShip.push([timestamp, invoiceNo, itemName, qty, note]);
+      itemsToMark.push(itemName);
+
+      // JIKA STATUS 'MASUK', siapkan data untuk Riwayat Supabase
+      if (status === 'masuk') {
+        itemsForSupabase.push({
+          jenis: 'Barang Keluar', // Penjualan dihitung sebagai barang keluar
+          nama_barang: itemName.toUpperCase(),
+          jumlah: qty,
+          keterangan: `Penjualan: ${invoiceNo}`
+        });
+      }
+    }
+  });
+
+  if (dataToShip.length === 0) {
+    showToast("Pilih status item terlebih dahulu", true);
+    return;
+  }
+
+  setLoading(true);
+  try {
+    // --- PROSES 1: INSERT KE SUPABASE RIWAYAT ---
+    if (itemsForSupabase.length > 0) {
+      const { error: sbError } = await _supabase
+        .from('riwayat')
+        .insert(itemsForSupabase);
+      
+      if (sbError) throw new Error("Gagal simpan riwayat Supabase: " + sbError.message);
+      
+      // Update juga stok sisa di Supabase (Opsional: Jika ingin otomatis potong stok)
+      for (const item of itemsForSupabase) {
+        const { data: currentStok } = await _supabase
+          .from('stok')
+          .select('sisa')
+          .eq('nama', item.nama_barang)
+          .maybeSingle();
+        
+        if (currentStok) {
+          const sisaBaru = currentStok.sisa - item.jumlah;
+          await _supabase.from('stok').update({ sisa: sisaBaru }).eq('nama', item.nama_barang);
         }
-      });
-
-      if (dataToShip.length === 0) return showToast("Pilih status item!", true);
-
-      isSubmitting = true;
-      showToast("Mengirim data...");
-      try {
-        await fetch(SCRIPT_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(dataToShip) });
-        showToast("Berhasil disimpan!");
-        closeModal();
-        fetchPenjualanData();
-      } catch (e) {
-        showToast("Gagal!", true);
-      } finally {
-        isSubmitting = false;
       }
     }
 
+    // --- PROSES 2: KIRIM KE GOOGLE SHEETS ---
+    await fetch(SCRIPT_WEB_APP_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(dataToShip)
+    });
+    
+    // UI Update
+    itemsToMark.forEach(name => storedItemsLog.add(`${invoiceNo}|${name}`));
+    updateInvoiceStatusLocally(invoiceNo);
+    renderPenjualan(window.lastSalesData);
+    
+    // Refresh tab riwayat & stok agar data terbaru muncul jika user pindah tab
+    dataLoaded.riwayat = false;
+    dataLoaded.stok = false;
+
+    showToast("Berhasil simpan ke Riwayat & Spreadsheet.");
+    setLoading(false);
+    closeModal();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Gagal mengirim data", true);
+    setLoading(false);
+  }
+}
     // LOGIKA TAB RIWAYAT & STOK (SUPABASE)
     async function loadRiwayat() {
       const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false }).limit(50);
