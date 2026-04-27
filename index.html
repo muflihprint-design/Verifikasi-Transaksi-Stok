@@ -90,7 +90,9 @@
       <div class="glass-card p-4 shadow-md">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-black text-slate-800 text-sm uppercase">Data Penjualan</h3>
-          <button onclick="fetchPenjualanData()" class="text-indigo-600 p-2"><i id="syncIconPenjualan" class="fas fa-sync-alt"></i></button>
+          <button onclick="fetchPenjualanData(true)" class="text-indigo-600 p-2">
+  <i id="syncIconPenjualan" class="fas fa-sync-alt"></i>
+</button>
         </div>
         <div class="flex gap-2 mb-2 overflow-x-auto pb-2">
           <div id="filter-pending" onclick="setSalesFilter('pending')" class="filter-chip active">Belum</div>
@@ -291,43 +293,47 @@
     }
 
     // LOGIKA TAB PENJUALAN (FITUR BARU)
-    async function fetchPenjualanData() {
-      const icon = document.getElementById('syncIconPenjualan');
-      const body = document.getElementById('penjualanBody');
-      icon.classList.add('animate-spin');
-      body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Sinkronisasi data...</td></tr>`;
+   async function fetchPenjualanData(isManual = false) {
+  const icon = document.getElementById('syncIconPenjualan');
+  const body = document.getElementById('penjualanBody');
+  icon.classList.add('animate-spin');
+  body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Sinkronisasi data...</td></tr>`;
 
+  try {
+    const histRes = await fetch(SCRIPT_WEB_APP_URL + "?action=getHistory&cache=" + Date.now());
+    const historyData = await histRes.json();
+    
+    storedItemsLog.clear();
+    historyData.forEach(row => { if (row[1] && row[2]) storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`); });
+
+    const salesRes = await fetch(SHEET_SALES_URL + "&cache=" + Date.now());
+    const salesCsv = await salesRes.text();
+    const rows = parseCSV(salesCsv);
+    
+    window.lastSalesData = rows.slice(1).filter(row => row[3] && row[3].trim().toLowerCase() === 'penjualan');
+    
+    processedInvoices.clear();
+    window.lastSalesData.forEach(row => {
+      const inv = row[0].trim();
       try {
-        const histRes = await fetch(SCRIPT_WEB_APP_URL + "?action=getHistory&cache=" + Date.now());
-        const historyData = await histRes.json();
-        
-        storedItemsLog.clear();
-        historyData.forEach(row => { if (row[1] && row[2]) storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`); });
+        const items = JSON.parse(row[10]);
+        if (items.every(i => storedItemsLog.has(`${inv}|${i.nama.trim()}`))) processedInvoices.add(inv);
+      } catch(e) {}
+    });
 
-        const salesRes = await fetch(SHEET_SALES_URL + "&cache=" + Date.now());
-        const salesCsv = await salesRes.text();
-        const rows = parseCSV(salesCsv);
-        
-        window.lastSalesData = rows.slice(1).filter(row => row[3] && row[3].trim().toLowerCase() === 'penjualan');
-        
-        processedInvoices.clear();
-        window.lastSalesData.forEach(row => {
-          const inv = row[0].trim();
-          try {
-            const items = JSON.parse(row[10]);
-            if (items.every(i => storedItemsLog.has(`${inv}|${i.nama.trim()}`))) processedInvoices.add(inv);
-          } catch(e) {}
-        });
+    renderPenjualan(window.lastSalesData);
+    dataLoaded.penjualan = true;
 
-        renderPenjualan(window.lastSalesData);
-        dataLoaded.penjualan = true;
-        showToast("Data Penjualan Diperbarui");
-      } catch (err) {
-        showToast("Gagal mengambil data Spreadsheet", true);
-      } finally {
-        icon.classList.remove('animate-spin');
-      }
+    // Hanya tampilkan toast jika ditekan secara manual
+    if (isManual) {
+      showToast("Data Penjualan Diperbarui");
     }
+  } catch (err) {
+    showToast("Gagal mengambil data Spreadsheet", true);
+  } finally {
+    icon.classList.remove('animate-spin');
+  }
+}
 
     function renderPenjualan(data) {
       const body = document.getElementById('penjualanBody');
