@@ -134,7 +134,6 @@
   <script>
     const SHEET_SALES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
     
-    // Updated Script URL
     const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEY6Pazj1Vur4LboaIdAgR8LRYJqQ8e4QQGiBElyQrYxxMMTdIZaUTkwCzbwtEiRJNjA/exec"; 
 
     let currentSelectedTransaction = null;
@@ -171,6 +170,7 @@
       
       try {
         const items = JSON.parse(jsonStr);
+        // Cek log item (apakah sudah diproses masuk riwayat ATAU diabaikan sebelumnya)
         const filteredItems = items.filter(item => !storedItemsLog.has(`${invoice}|${item.nama}`));
         
         currentSelectedTransaction = { invoice, items: filteredItems };
@@ -178,7 +178,7 @@
         if (filteredItems.length === 0) {
           itemsList.innerHTML = `<div class="text-center py-10">
             <i class="fas fa-check-double text-emerald-500 text-4xl mb-3"></i>
-            <p class="text-slate-500 text-sm font-medium">Semua item sudah tercatat di Spreadsheet.</p>
+            <p class="text-slate-500 text-sm font-medium">Semua item sudah tercatat di Spreadsheet (Masuk/Abaikan).</p>
           </div>`;
           document.getElementById('btnSubmitModal').classList.add('hidden');
         } else {
@@ -342,19 +342,17 @@
       body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Membaca data dari Backend...</td></tr>`;
 
       try {
-        // Fetch history via doGet from the new Web App URL
         const histRes = await fetch(SCRIPT_WEB_APP_URL + "?action=getHistory&cache=" + Date.now());
         const historyData = await histRes.json();
         
         storedItemsLog.clear();
         historyData.forEach(row => {
-          // Expecting format: [Timestamp, Invoice, Product, Qty, Note]
+          // row[1] adalah Invoice, row[2] adalah Produk
           if (row[1] && row[2]) {
             storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`);
           }
         });
 
-        // Fetch sales data via CSV
         const salesRes = await fetch(SHEET_SALES_URL + "&cache=" + Date.now());
         const salesCsv = await salesRes.text();
         const rows = parseCSV(salesCsv);
@@ -366,6 +364,7 @@
             const invoice = row[0];
             try {
                 const items = JSON.parse(row[10]);
+                // Logika: Invoice SELESAI jika setiap item di dalamnya ada di storedItemsLog (baik Masuk maupun Abaikan)
                 const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama}`));
                 if (isAllDone) {
                     processedInvoices.add(invoice);
