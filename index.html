@@ -6,392 +6,303 @@
   <title>Muflih Print - Inventory & Sales</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); min-height: 100vh; font-family: sans-serif; }
     .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 1rem; }
-    .nav-btn { color: #64748b; font-weight: 500; transition: all 0.2s; border-top: 2px solid transparent; }
-    .nav-btn.active { color: #6366f1; border-top: 2px solid #6366f1; background: rgba(99, 102, 241, 0.05); }
-    .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .modal-overlay { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); }
+    .nav-btn.active { color: #6366f1; border-top: 2px solid #6366f1; }
+    .badge-masuk { background: #dcfce7; color: #166534; }
+    .badge-keluar { background: #fee2e2; color: #991b1b; }
     
-    .item-card { border-left-width: 4px; transition: all 0.3s ease; }
-    .item-card.status-masuk { border-left-color: #10b981; background: white; }
-    .item-card.status-abaikan { border-left-color: #ef4444; background: #fff1f2; opacity: 0.8; }
-    .item-card.status-none { border-left-color: #cbd5e1; background: #f8fafc; }
-    
-    .status-processed { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-    .status-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
-    
-    .btn-status { width: 32px; height: 32px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.75rem; }
+    #topProgressBar {
+      position: fixed; top: 0; left: 0; width: 0%; height: 3px;
+      background: #6366f1; z-index: 10000; transition: width 0.3s ease;
+    }
 
-    /* Filter UI styling */
-    .filter-chip { padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
-    .filter-chip.active { background: #6366f1; color: white; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); }
+    /* Modal Styles */
+    .status-masuk { border-left: 4px solid #10b981; background: #f0fdf4; }
+    .status-abaikan { border-left: 4px solid #ef4444; background: #fef2f2; opacity: 0.7; }
+    .status-none { border-left: 4px solid #94a3b8; }
+    .btn-status { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 12px; }
+    
+    .status-processed { background: #dcfce7; color: #166534; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+
+    .filter-chip { padding: 6px 16px; border-radius: 99px; font-size: 10px; font-weight: 800; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+    .filter-chip.active { background: #6366f1; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
     .filter-chip.inactive { background: #f1f5f9; color: #64748b; }
-    .filter-chip.inactive:hover { background: #e2e8f0; }
+
+    #catalogOverlay {
+      position: fixed; inset: 0; background: #f8fafc; z-index: 1000;
+      display: flex; flex-direction: column; transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #catalogOverlay.active { transform: translateY(0); }
   </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 pb-24 text-slate-800">
 
-  <div class="max-w-6xl mx-auto glass-card shadow-2xl overflow-hidden">
-    <!-- Navigation Tabs -->
-    <div class="flex border-b">
-      <button onclick="switchTab('stok')" id="tab-stok" class="nav-btn active flex-1 py-4 text-sm md:text-base">
-        <i class="fas fa-boxes mr-2"></i>Stok Barang
-      </button>
-      <button onclick="switchTab('penjualan')" id="tab-penjualan" class="nav-btn flex-1 py-4 text-sm md:text-base">
-        <i class="fas fa-shopping-cart mr-2"></i>Daftar Penjualan
-      </button>
+  <div id="topProgressBar"></div>
+
+  <div id="statusToast" class="fixed top-4 right-4 left-4 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl z-[9999] transform -translate-y-24 transition-transform duration-300 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <i class="fas fa-circle-notch animate-spin" id="toastIcon"></i>
+      <span id="toastMsg" class="text-xs font-bold">Memproses...</span>
+    </div>
+  </div>
+
+  <div class="mb-6 text-center text-white">
+    <h1 class="text-xl font-bold tracking-widest uppercase">Muflih Print</h1>
+    <p class="text-xs opacity-60">Inventory & Sales System</p>
+  </div>
+
+  <div id="main-content" class="max-w-md mx-auto">
+    
+    <div id="tab-input" class="glass-card p-5 shadow-xl">
+      <h2 class="font-bold mb-4 flex items-center text-indigo-700"><i class="fas fa-plus-circle mr-2"></i> Transaksi Baru</h2>
+      <div class="mb-4">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Keterangan / Nama Pelanggan</label>
+        <input type="text" id="inputKeterangan" class="mt-1 block w-full p-3 bg-gray-50 border border-gray-200 font-bold text-slate-700 rounded-lg outline-none" placeholder="Contoh: Pesanan Bpk. Andi">
+      </div>
+      <div class="mb-4">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Jenis Transaksi</label>
+        <select id="inputJenisGlobal" class="mt-1 block w-full p-3 bg-indigo-50 border-none font-bold text-indigo-700 rounded-lg">
+          <option value="Barang Masuk">Barang Masuk</option>
+          <option value="Barang Keluar">Barang Keluar</option>
+        </select>
+      </div>
+      <form id="stokForm" class="space-y-4">
+        <div id="itemContainer" class="space-y-3"></div>
+        <button type="button" onclick="addItemRow()" class="w-full py-2 border-2 border-dashed border-indigo-200 text-indigo-500 rounded-xl text-xs font-bold hover:bg-indigo-50 transition flex items-center justify-center gap-2">
+          <i class="fas fa-plus"></i> TAMBAH BARANG
+        </button>
+        <div class="pt-4">
+          <button type="submit" id="btnSubmitForm" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2">
+            <i class="fas fa-save" id="iconSave"></i>
+            <i class="fas fa-circle-notch animate-spin hidden" id="iconLoading"></i>
+            <span id="btnText">SIMPAN TRANSAKSI</span>
+          </button>
+        </div>
+      </form>
     </div>
 
-    <!-- Content: Stok -->
-    <div id="content-stok" class="p-4 md:p-6">
-      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 class="text-2xl font-bold text-slate-800">Manajemen Stok</h2>
-        <div class="relative w-full md:w-64">
-          <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-            <i class="fas fa-search"></i>
-          </span>
-          <input type="text" id="searchStok" onkeyup="filterTableStok()" placeholder="Cari produk..." 
-            class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+    <div id="tab-penjualan" class="hidden space-y-4">
+      <div class="glass-card p-4 shadow-md">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-black text-slate-800 text-sm uppercase">Data Penjualan</h3>
+          <button onclick="fetchPenjualanData()" class="text-indigo-600 p-2"><i id="syncIconPenjualan" class="fas fa-sync-alt"></i></button>
+        </div>
+        <div class="flex gap-2 mb-2 overflow-x-auto pb-2">
+          <div id="filter-pending" onclick="setSalesFilter('pending')" class="filter-chip active">Belum</div>
+          <div id="filter-done" onclick="setSalesFilter('done')" class="filter-chip inactive">Selesai</div>
+          <div id="filter-all" onclick="setSalesFilter('all')" class="filter-chip inactive">Semua</div>
         </div>
       </div>
-      
-      <div class="table-container">
-        <table id="mainTableStok" class="w-full text-left">
-          <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
+      <div class="glass-card overflow-hidden">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase">
             <tr>
-              <th class="px-4 py-3">Produk</th>
-              <th class="px-4 py-3">Stok Saat Ini</th>
-              <th class="px-4 py-3">Update Terakhir</th>
+              <th class="px-4 py-3">Waktu</th>
+              <th class="px-4 py-3">Invoice</th>
+              <th class="px-4 py-3">Item</th>
+              <th class="px-4 py-3 text-center">Status</th>
             </tr>
           </thead>
-          <tbody id="stokBody" class="divide-y divide-slate-100 text-slate-700">
-            <tr><td colspan="3" class="px-4 py-8 text-center text-slate-400">Memuat data stok...</td></tr>
+          <tbody id="penjualanBody" class="divide-y divide-slate-100 bg-white">
+            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Klik tombol sinkron atau pindah tab.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Content: Penjualan -->
-    <div id="content-penjualan" class="p-4 md:p-6 hidden">
-      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div>
-          <h2 class="text-2xl font-bold text-slate-800">Daftar Transaksi Penjualan</h2>
-          <!-- Filter Chips -->
-          <div class="flex gap-2 mt-3">
-            <div id="filter-pending" onclick="setSalesFilter('pending')" class="filter-chip active">
-              <i class="fas fa-clock mr-1"></i> Belum
-            </div>
-            <div id="filter-done" onclick="setSalesFilter('done')" class="filter-chip inactive">
-              <i class="fas fa-check-double mr-1"></i> Selesai
-            </div>
-            <div id="filter-all" onclick="setSalesFilter('all')" class="filter-chip inactive">
-              Semua
-            </div>
-          </div>
+    <div id="tab-riwayat" class="hidden space-y-4">
+      <div class="glass-card p-4 shadow-md">
+        <input type="text" id="searchRiwayat" onkeyup="filterRiwayat()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm mb-3" placeholder="Cari riwayat...">
+        <div class="flex gap-2">
+          <button onclick="setFilterDate('today')" id="btnFilterToday" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold">HARI INI</button>
+          <button onclick="setFilterDate('all')" id="btnFilterAll" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-[10px] font-bold">SEMUA</button>
         </div>
-        <button onclick="fetchPenjualanData()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition shadow-md">
-          <i class="fas fa-sync-alt mr-2" id="syncIconPenjualan"></i>Refresh & Sinkronisasi
+      </div>
+      <div id="listRiwayat" class="space-y-2"></div>
+    </div>
+
+    <div id="tab-stok" class="hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-white font-bold text-sm">Posisi Stok</h3>
+        <button onclick="recalculateStock()" class="bg-slate-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5">
+          <i class="fas fa-sync-alt" id="syncIcon"></i> RE-STOK
         </button>
       </div>
-
-      <div class="table-container">
-        <table class="w-full text-left">
-          <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
-            <tr>
-              <th class="px-4 py-3">Tanggal</th>
-              <th class="px-4 py-3">No. Transaksi</th>
-              <th class="px-4 py-3">Detail Barang</th>
-              <th class="px-4 py-3 text-center">Status Stok</th>
-            </tr>
-          </thead>
-          <tbody id="penjualanBody" class="divide-y divide-slate-100 text-slate-700">
-            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">Klik refresh untuk memuat data penjualan.</td></tr>
-          </tbody>
+      <div class="glass-card p-3 shadow-md">
+        <input type="text" id="searchStok" onkeyup="filterTableStok()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm" placeholder="Cari nama stok...">
+      </div>
+      <div class="glass-card overflow-hidden">
+        <table class="w-full">
+          <tbody id="tableStok" class="divide-y divide-gray-200 bg-white"></tbody>
         </table>
       </div>
     </div>
+
   </div>
 
-  <!-- Modal Edit Stok Keluar -->
-  <div id="modalEdit" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-200" id="modalContainer">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-bold text-slate-800">Proses Stok Keluar</h3>
-          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
-            <i class="fas fa-times"></i>
-          </button>
+  <div id="modalEdit" class="fixed inset-0 z-[1000] flex items-center justify-center p-4 hidden">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div id="modalContainer" class="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-95 opacity-0 flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
+        <div>
+          <h3 class="font-black text-slate-800 text-sm uppercase">Detail Item Transaksi</h3>
+          <p id="modalTransactionRef" class="text-[10px] font-mono text-indigo-600 font-bold"></p>
         </div>
-        
-        <div class="mb-4 p-3 bg-indigo-50 rounded-lg">
-          <p class="text-xs font-semibold text-indigo-600 uppercase mb-1">Transaksi Terkait:</p>
-          <p id="modalTransactionRef" class="font-mono text-sm text-slate-700 font-bold">-</p>
-        </div>
-
-        <div id="modalItemsList" class="space-y-4 mb-6 max-h-80 overflow-y-auto pr-2">
-          <!-- Daftar item akan diisi di sini -->
-        </div>
-
-        <div class="flex flex-col gap-3 border-t pt-4">
-          <button onclick="submitStokKeluar()" id="btnSubmitModal" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center shadow-lg shadow-indigo-200 disabled:bg-slate-400 disabled:shadow-none">
-            <i class="fas fa-save mr-2"></i> Simpan Item Terpilih
-          </button>
-          <button onclick="closeModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium py-2 rounded-lg transition">
-            Batal
-          </button>
-        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times-circle text-xl"></i></button>
+      </div>
+      <div id="modalItemsList" class="p-4 space-y-4 overflow-y-auto flex-1"></div>
+      <div class="p-4 bg-slate-50 border-t">
+        <button id="btnSubmitModal" onclick="submitStokKeluar()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center">
+          <i class="fas fa-save mr-2"></i> Simpan Item Terpilih
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-lg transform translate-y-20 transition-all duration-300 opacity-0 bg-slate-800 text-white z-50">
-    <span id="toastMsg">Pesan</span>
-  </div>
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2 flex justify-between shadow-2xl z-50">
+    <button onclick="showTab('input')" id="nav-input" class="nav-btn flex-1 flex flex-col items-center text-gray-400 py-2 active">
+      <i class="fas fa-plus-square text-lg"></i><span class="text-[9px] mt-1">Input</span>
+    </button>
+    <button onclick="showTab('penjualan')" id="nav-penjualan" class="nav-btn flex-1 flex flex-col items-center text-gray-400 py-2">
+      <i class="fas fa-shopping-cart text-lg"></i><span class="text-[9px] mt-1">Penjualan</span>
+    </button>
+    <button onclick="showTab('riwayat')" id="nav-riwayat" class="nav-btn flex-1 flex flex-col items-center text-gray-400 py-2">
+      <i class="fas fa-history text-lg"></i><span class="text-[9px] mt-1">Riwayat</span>
+    </button>
+    <button onclick="showTab('stok')" id="nav-stok" class="nav-btn flex-1 flex flex-col items-center text-gray-400 py-2">
+      <i class="fas fa-box text-lg"></i><span class="text-[9px] mt-1">Stok</span>
+    </button>
+  </nav>
+
+  <datalist id="produkList"></datalist>
 
   <script>
+    // KONFIGURASI URL
+    const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
     const SHEET_SALES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
-    
     const SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEY6Pazj1Vur4LboaIdAgR8LRYJqQ8e4QQGiBElyQrYxxMMTdIZaUTkwCzbwtEiRJNjA/exec"; 
 
-    let currentSelectedTransaction = null;
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // STATE MANAGEMENT
+    let masterRiwayat = [];
+    let dataLoaded = { riwayat: false, stok: false, penjualan: false };
+    let isProcessing = false;
+    let isSubmitting = false; // Untuk modal penjualan
+    let currentSalesFilter = 'pending';
     let processedInvoices = new Set(); 
-    let storedItemsLog = new Set(); // Format: "Invoice|NamaProduk"
-    let isSubmitting = false;
-    let currentSalesFilter = 'pending'; // Default filter ke 'pending' (Belum)
+    let storedItemsLog = new Set();
+    let currentSelectedTransaction = null;
 
-    function switchTab(tab) {
-      document.getElementById('content-stok').classList.toggle('hidden', tab !== 'stok');
-      document.getElementById('content-penjualan').classList.toggle('hidden', tab !== 'penjualan');
-      document.getElementById('tab-stok').classList.toggle('active', tab === 'stok');
-      document.getElementById('tab-penjualan').classList.toggle('active', tab === 'penjualan');
-      if (tab === 'penjualan' && !window.penjualanLoaded) fetchPenjualanData();
-    }
-
-    function setSalesFilter(filter) {
-      currentSalesFilter = filter;
-      
-      // Update UI Chips
-      ['pending', 'done', 'all'].forEach(f => {
-        const chip = document.getElementById(`filter-${f}`);
-        if (f === filter) {
-          chip.classList.add('active');
-          chip.classList.remove('inactive');
-        } else {
-          chip.classList.add('inactive');
-          chip.classList.remove('active');
-        }
+    // FUNGSI NAVIGASI
+    function showTab(name) {
+      if (isProcessing) return;
+      ['input', 'penjualan', 'riwayat', 'stok'].forEach(t => {
+        document.getElementById('tab-' + t).classList.add('hidden');
+        document.getElementById('nav-' + t).classList.remove('active', 'text-indigo-600');
       });
-
-      // Re-render table
-      if (window.lastSalesData) {
-        renderPenjualan(window.lastSalesData);
-      }
+      document.getElementById('tab-' + name).classList.remove('hidden');
+      document.getElementById('nav-' + name).classList.add('active', 'text-indigo-600');
+      
+      if (name === 'riwayat' && !dataLoaded.riwayat) loadRiwayat();
+      if (name === 'stok' && !dataLoaded.stok) loadStok();
+      if (name === 'penjualan' && !dataLoaded.penjualan) fetchPenjualanData();
     }
 
+    // FUNGSI TOAST
     function showToast(msg, isError = false) {
-      const toast = document.getElementById('toast');
+      const toast = document.getElementById('statusToast');
       const toastMsg = document.getElementById('toastMsg');
       toastMsg.innerText = msg;
-      toast.classList.remove('translate-y-20', 'opacity-0');
-      toast.classList.add(isError ? 'bg-red-600' : 'bg-slate-800');
-      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+      toast.classList.remove('-translate-y-24', 'bg-indigo-600', 'bg-red-600');
+      toast.classList.add('translate-y-0', isError ? 'bg-red-600' : 'bg-indigo-600');
+      if(isError) setTimeout(hideToast, 4000);
     }
 
-    function openModalWithTransaction(invoice, jsonStr) {
-      if (isSubmitting) return;
-      const modal = document.getElementById('modalEdit');
-      const container = document.getElementById('modalContainer');
-      const itemsList = document.getElementById('modalItemsList');
-      const refText = document.getElementById('modalTransactionRef');
+    function hideToast() {
+      document.getElementById('statusToast').classList.replace('translate-y-0', '-translate-y-24');
+    }
 
-      refText.innerText = invoice;
-      itemsList.innerHTML = '';
-      
+    // LOGIKA TAB INPUT
+    function addItemRow() {
+      const container = document.getElementById('itemContainer');
+      const rowId = Date.now();
+      const div = document.createElement('div');
+      div.className = "flex gap-2 items-end animate-in slide-in-from-top-2 duration-200";
+      div.id = `row-${rowId}`;
+      div.innerHTML = `
+        <div class="flex-1">
+          <input type="text" name="namaBarang" list="produkList" oninput="this.value = this.value.toUpperCase()" class="w-full p-2.5 bg-gray-50 border rounded-lg text-sm" placeholder="Nama Barang" required>
+        </div>
+        <div class="w-20">
+          <input type="number" name="jumlahBarang" class="w-full p-2.5 bg-gray-50 border rounded-lg text-sm" placeholder="Qty" required>
+        </div>
+        <button type="button" onclick="document.getElementById('row-${rowId}').remove()" class="p-2 text-red-300"><i class="fas fa-times-circle"></i></button>
+      `;
+      container.appendChild(div);
+    }
+
+    document.getElementById('stokForm').onsubmit = async function(e) {
+      e.preventDefault();
+      setProcessingState(true);
+      const rows = document.querySelectorAll('#itemContainer > div');
+      const ket = document.getElementById('inputKeterangan').value;
+      const jenis = document.getElementById('inputJenisGlobal').value;
+
       try {
-        const items = JSON.parse(jsonStr);
-        const filteredItems = items.filter(item => !storedItemsLog.has(`${invoice.trim()}|${item.nama.trim()}`));
-        
-        currentSelectedTransaction = { invoice, items: filteredItems };
+        for (let row of rows) {
+          const nama = row.querySelector('[name="namaBarang"]').value.toUpperCase();
+          const qty = parseInt(row.querySelector('[name="jumlahBarang"]').value);
+          
+          // Update Supabase Stok
+          const { data: cur } = await _supabase.from('stok').select('sisa').eq('nama', nama).maybeSingle();
+          const change = (jenis === 'Barang Masuk') ? qty : -qty;
+          const newSisa = (cur ? cur.sisa : 0) + change;
 
-        if (filteredItems.length === 0) {
-          itemsList.innerHTML = `<div class="text-center py-10">
-            <i class="fas fa-check-double text-emerald-500 text-4xl mb-3"></i>
-            <p class="text-slate-500 text-sm font-medium">Semua item sudah tercatat di Spreadsheet (Masuk/Abaikan).</p>
-          </div>`;
-          document.getElementById('btnSubmitModal').classList.add('hidden');
-        } else {
-          document.getElementById('btnSubmitModal').classList.remove('hidden');
-          filteredItems.forEach((item, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.id = `item-card-${index}`;
-            itemDiv.className = "item-card border rounded-lg p-3 shadow-sm transition-all duration-200 status-none";
-            itemDiv.dataset.status = "none";
-            
-            itemDiv.innerHTML = `
-              <div class="flex justify-between items-start mb-3">
-                <div class="flex flex-col">
-                  <span class="font-bold text-slate-800 text-sm">${item.nama}</span>
-                  <span class="text-[10px] text-slate-500">Tagihan: <span class="font-bold">${item.qty}</span></span>
-                </div>
-                <div class="flex gap-2">
-                   <button onclick="setItemStatus(${index}, 'masuk')" id="btn-masuk-${index}" title="Simpan sebagai Stok Keluar"
-                      class="btn-status bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600">
-                      <i class="fas fa-check"></i>
-                   </button>
-                   <button onclick="setItemStatus(${index}, 'abaikan')" id="btn-abaikan-${index}" title="Simpan sebagai Diabaikan"
-                      class="btn-status bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600">
-                      <i class="fas fa-times"></i>
-                   </button>
-                   <button onclick="setItemStatus(${index}, 'none')" id="btn-none-${index}"
-                      class="btn-status bg-slate-200 text-slate-600 ring-2 ring-slate-400">
-                      <i class="fas fa-minus"></i>
-                   </button>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <label class="text-[10px] text-slate-500 font-semibold uppercase">Qty Keluar:</label>
-                <input type="number" value="${item.qty}" min="1" id="input-qty-${index}"
-                  class="w-20 px-2 py-1 border-2 border-slate-200 rounded focus:border-indigo-500 outline-none font-bold text-slate-700 text-sm">
-              </div>
-            `;
-            itemsList.appendChild(itemDiv);
-          });
+          if (cur) await _supabase.from('stok').update({ sisa: newSisa }).eq('nama', nama);
+          else await _supabase.from('stok').insert([{ nama: nama, sisa: change }]);
+
+          // Insert Riwayat
+          await _supabase.from('riwayat').insert([{ jenis, nama_barang: nama, jumlah: qty, keterangan: ket }]);
         }
-      } catch (e) {
-        itemsList.innerHTML = `<p class="text-red-500 text-sm">Kesalahan memuat detail.</p>`;
-      }
-
-      modal.classList.remove('hidden');
-      setTimeout(() => {
-        container.classList.remove('scale-95', 'opacity-0');
-        container.classList.add('scale-100', 'opacity-100');
-      }, 10);
-    }
-
-    function setItemStatus(index, status) {
-      const card = document.getElementById(`item-card-${index}`);
-      const input = document.getElementById(`input-qty-${index}`);
-      const btnMasuk = document.getElementById(`btn-masuk-${index}`);
-      const btnAbaikan = document.getElementById(`btn-abaikan-${index}`);
-      const btnNone = document.getElementById(`btn-none-${index}`);
-
-      [btnMasuk, btnAbaikan, btnNone].forEach(btn => {
-        btn.classList.remove('ring-2', 'ring-emerald-500', 'ring-red-500', 'ring-slate-400', 'bg-emerald-100', 'text-emerald-600', 'bg-red-100', 'text-red-600', 'bg-slate-200', 'text-slate-600');
-        btn.classList.add('bg-slate-100', 'text-slate-400');
-      });
-      card.classList.remove('status-masuk', 'status-abaikan', 'status-none');
-      card.dataset.status = status;
-
-      if (status === 'masuk') {
-        card.classList.add('status-masuk');
-        btnMasuk.classList.add('bg-emerald-100', 'text-emerald-600', 'ring-2', 'ring-emerald-500');
-        input.disabled = false;
-      } else if (status === 'abaikan') {
-        card.classList.add('status-abaikan');
-        btnAbaikan.classList.add('bg-red-100', 'text-red-600', 'ring-2', 'ring-red-500');
-        input.disabled = true;
-      } else {
-        card.classList.add('status-none');
-        btnNone.classList.add('bg-slate-200', 'text-slate-600', 'ring-2', 'ring-slate-400');
-        input.disabled = false;
-      }
-    }
-
-    function closeModal() {
-      if (isSubmitting) return;
-      const container = document.getElementById('modalContainer');
-      container.classList.remove('scale-100', 'opacity-100');
-      container.classList.add('scale-95', 'opacity-0');
-      setTimeout(() => {
-        document.getElementById('modalEdit').classList.add('hidden');
-      }, 200);
-    }
-
-    async function submitStokKeluar() {
-      if (isSubmitting) return;
-      
-      const itemCards = document.querySelectorAll('.item-card');
-      const dataToShip = [];
-      const invoiceNo = currentSelectedTransaction.invoice.trim();
-      const timestamp = new Date().toLocaleString('id-ID');
-      
-      let itemsToMark = [];
-
-      itemCards.forEach((card, index) => {
-        const input = document.getElementById(`input-qty-${index}`);
-        const itemName = currentSelectedTransaction.items[index].nama.trim();
-        const status = card.dataset.status;
-        
-        if (status !== 'none') {
-            const qty = parseInt(input.value) || 0;
-            const note = status === 'masuk' ? "MASUK RIWAYAT" : "DIABAIKAN";
-            dataToShip.push([timestamp, invoiceNo, itemName, qty, note]);
-            itemsToMark.push(itemName);
-        }
-      });
-
-      if (dataToShip.length === 0) {
-        showToast("Pilih status item terlebih dahulu", true);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        await fetch(SCRIPT_WEB_APP_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(dataToShip)
-        });
-        
-        itemsToMark.forEach(name => storedItemsLog.add(`${invoiceNo}|${name}`));
-        updateInvoiceStatusLocally(invoiceNo);
-        renderPenjualan(window.lastSalesData);
-        showToast("Berhasil terkirim ke Spreadsheet.");
-        setLoading(false);
-        closeModal();
+        showToast("Transaksi Berhasil Disimpan!");
+        document.getElementById('itemContainer').innerHTML = '';
+        addItemRow();
+        dataLoaded.stok = false;
+        dataLoaded.riwayat = false;
       } catch (err) {
-        showToast("Gagal mengirim data", true);
-        setLoading(false);
+        showToast("Error: " + err.message, true);
+      } finally {
+        setProcessingState(false);
       }
+    };
+
+    function setProcessingState(proc) {
+      isProcessing = proc;
+      document.getElementById('btnSubmitForm').disabled = proc;
+      document.getElementById('iconSave').classList.toggle('hidden', proc);
+      document.getElementById('iconLoading').classList.toggle('hidden', !proc);
     }
 
-    function updateInvoiceStatusLocally(invoice) {
-        const rowData = window.lastSalesData.find(r => r[0].trim() === invoice.trim());
-        if (rowData) {
-            try {
-                const items = JSON.parse(rowData[10]);
-                const isAllDone = items.every(i => storedItemsLog.has(`${invoice.trim()}|${i.nama.trim()}`));
-                if (isAllDone) processedInvoices.add(invoice.trim());
-            } catch(e) {}
-        }
-    }
-
-    function setLoading(loading) {
-      isSubmitting = loading;
-      const btn = document.getElementById('btnSubmitModal');
-      btn.disabled = loading;
-      btn.innerHTML = loading ? '<i class="fas fa-spinner animate-spin mr-2"></i> Mengirim...' : '<i class="fas fa-save mr-2"></i> Simpan Item Terpilih';
-    }
-
+    // LOGIKA TAB PENJUALAN (FITUR BARU)
     async function fetchPenjualanData() {
       const icon = document.getElementById('syncIconPenjualan');
       const body = document.getElementById('penjualanBody');
       icon.classList.add('animate-spin');
-      body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Membaca data dari Backend...</td></tr>`;
+      body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Sinkronisasi data...</td></tr>`;
 
       try {
         const histRes = await fetch(SCRIPT_WEB_APP_URL + "?action=getHistory&cache=" + Date.now());
         const historyData = await histRes.json();
         
         storedItemsLog.clear();
-        historyData.forEach(row => {
-          if (row[1] && row[2]) {
-            storedItemsLog.add(`${row[1].toString().trim()}|${row[2].toString().trim()}`);
-          }
-        });
+        historyData.forEach(row => { if (row[1] && row[2]) storedItemsLog.add(`${row[1].trim()}|${row[2].trim()}`); });
 
         const salesRes = await fetch(SHEET_SALES_URL + "&cache=" + Date.now());
         const salesCsv = await salesRes.text();
@@ -401,110 +312,210 @@
         
         processedInvoices.clear();
         window.lastSalesData.forEach(row => {
-            const invoice = row[0].trim();
-            try {
-                const items = JSON.parse(row[10]);
-                const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama.trim()}`));
-                if (isAllDone) {
-                    processedInvoices.add(invoice);
-                }
-            } catch(e) {}
+          const inv = row[0].trim();
+          try {
+            const items = JSON.parse(row[10]);
+            if (items.every(i => storedItemsLog.has(`${inv}|${i.nama.trim()}`))) processedInvoices.add(inv);
+          } catch(e) {}
         });
 
         renderPenjualan(window.lastSalesData);
-        window.penjualanLoaded = true;
-        showToast("Sinkronisasi Selesai");
+        dataLoaded.penjualan = true;
+        showToast("Data Penjualan Diperbarui");
       } catch (err) {
-        console.error("Fetch Error:", err);
-        showToast("Gagal mengambil data dari Backend", true);
+        showToast("Gagal mengambil data Spreadsheet", true);
       } finally {
         icon.classList.remove('animate-spin');
       }
     }
 
-    function parseCSV(text) {
-      const lines = text.split(/\r?\n/);
-      return lines.map(line => {
-        const result = [];
-        let cur = '', inQuote = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"' && line[i+1] === '"') { cur += '"'; i++; }
-          else if (char === '"') inQuote = !inQuote;
-          else if (char === ',' && !inQuote) { result.push(cur); cur = ''; }
-          else cur += char;
-        }
-        result.push(cur);
-        return result;
-      });
-    }
-
     function renderPenjualan(data) {
       const body = document.getElementById('penjualanBody');
-      
-      // Terapkan Filter
-      let filteredData = data;
-      if (currentSalesFilter === 'pending') {
-        filteredData = data.filter(row => !processedInvoices.has(row[0].trim()));
-      } else if (currentSalesFilter === 'done') {
-        filteredData = data.filter(row => processedInvoices.has(row[0].trim()));
-      }
+      let filtered = data;
+      if (currentSalesFilter === 'pending') filtered = data.filter(r => !processedInvoices.has(r[0].trim()));
+      else if (currentSalesFilter === 'done') filtered = data.filter(r => processedInvoices.has(r[0].trim()));
 
-      if (filteredData.length === 0) {
-        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Tidak ada data transaksi (${currentSalesFilter === 'pending' ? 'Belum' : (currentSalesFilter === 'done' ? 'Selesai' : 'Semua')}).</td></tr>`;
+      if (filtered.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">Tidak ada data.</td></tr>`;
         return;
       }
-      
-      body.innerHTML = filteredData.map(row => {
-        const invoice = row[0].trim();
-        const jsonDetail = row[10];
-        const isProcessed = processedInvoices.has(invoice);
 
+      body.innerHTML = filtered.map(row => {
+        const inv = row[0].trim();
+        const isProcessed = processedInvoices.has(inv);
         return `
-          <tr onclick='openModalWithTransaction("${invoice}", ${JSON.stringify(jsonDetail).replace(/'/g, "&apos;")})' 
-              class="hover:bg-indigo-50 cursor-pointer transition border-b border-slate-50 group ${isProcessed ? 'bg-emerald-50/20' : ''}">
-            <td class="px-4 py-4 text-xs whitespace-nowrap">${row[1]}</td>
-            <td class="px-4 py-4 font-mono text-xs text-indigo-600 font-bold">${invoice}</td>
-            <td class="px-4 py-4 text-sm">${renderItemBadges(invoice, jsonDetail)}</td>
+          <tr onclick='openModalWithTransaction("${inv}", ${JSON.stringify(row[10]).replace(/'/g, "&apos;")})' class="hover:bg-indigo-50 cursor-pointer border-b border-slate-50 ${isProcessed ? 'bg-emerald-50/20' : ''}">
+            <td class="px-4 py-4 text-[10px] whitespace-nowrap">${row[1]}</td>
+            <td class="px-4 py-4 font-mono text-xs text-indigo-600 font-bold">${inv}</td>
+            <td class="px-4 py-4 text-xs">${renderItemBadges(inv, row[10])}</td>
             <td class="px-4 py-4 text-center">
-              <span class="px-2 py-1 rounded-full text-[10px] font-bold shadow-sm ${isProcessed ? 'status-processed' : 'status-pending'}">
-                <i class="fas ${isProcessed ? 'fa-check-double mr-1' : 'fa-clock mr-1'}"></i>
+              <span class="px-2 py-1 rounded-full text-[9px] font-bold ${isProcessed ? 'status-processed' : 'status-pending'}">
                 ${isProcessed ? 'SELESAI' : 'BELUM'}
               </span>
             </td>
-          </tr>
-        `;
+          </tr>`;
       }).join('');
     }
 
-    function renderItemBadges(invoice, json) {
+    function renderItemBadges(inv, json) {
       try {
         const items = JSON.parse(json);
         return items.map(i => {
-          const isDone = storedItemsLog.has(`${invoice.trim()}|${i.nama.trim()}`);
-          return `<div class="flex items-center gap-2 text-[11px] mb-1 ${isDone ? 'text-emerald-700' : 'text-slate-500'}">
-            <span class="w-3 flex justify-center">${isDone ? '<i class="fas fa-check-circle"></i>' : '<i class="far fa-circle text-slate-300"></i>'}</span>
-            <span class="${isDone ? 'line-through opacity-60' : ''}">${i.nama}</span>
-            <span class="font-bold">(${i.qty})</span>
-          </div>`;
+          const isDone = storedItemsLog.has(`${inv.trim()}|${i.nama.trim()}`);
+          return `<div class="${isDone ? 'text-emerald-600 line-through opacity-50' : 'text-slate-600'}">• ${i.nama} (${i.qty})</div>`;
         }).join('');
-      } catch (e) { return `<span class="text-red-400 text-xs italic">JSON Error</span>`; }
+      } catch (e) { return 'Error Item'; }
     }
 
-    function filterTableStok() {
-      const filter = document.getElementById("searchStok").value.toUpperCase();
-      const tr = document.getElementById("stokBody").getElementsByTagName("tr");
-      for (let i = 0; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName("td")[0];
-        if (td) tr[i].style.display = td.innerText.toUpperCase().includes(filter) ? "" : "none";
+    function setSalesFilter(f) {
+      currentSalesFilter = f;
+      ['pending', 'done', 'all'].forEach(id => {
+        document.getElementById(`filter-${id}`).classList.toggle('active', id === f);
+        document.getElementById(`filter-${id}`).classList.toggle('inactive', id !== f);
+      });
+      renderPenjualan(window.lastSalesData);
+    }
+
+    // LOGIKA MODAL PENJUALAN
+    function openModalWithTransaction(invoice, jsonStr) {
+      if (isSubmitting) return;
+      currentSelectedTransaction = { invoice, items: JSON.parse(jsonStr) };
+      
+      const list = document.getElementById('modalItemsList');
+      document.getElementById('modalTransactionRef').innerText = invoice;
+      list.innerHTML = '';
+
+      const filtered = currentSelectedTransaction.items.filter(item => !storedItemsLog.has(`${invoice.trim()}|${item.nama.trim()}`));
+
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="text-center py-10 text-slate-400">Semua item sudah diproses.</div>';
+        document.getElementById('btnSubmitModal').classList.add('hidden');
+      } else {
+        document.getElementById('btnSubmitModal').classList.remove('hidden');
+        filtered.forEach((item, index) => {
+          const div = document.createElement('div');
+          div.id = `item-card-${index}`;
+          div.className = "item-card p-3 rounded-lg border status-none";
+          div.dataset.status = "none";
+          div.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-bold text-sm">${item.nama} (Qty: ${item.qty})</span>
+              <div class="flex gap-1">
+                <button onclick="setItemStatus(${index}, 'masuk')" id="btn-m-${index}" class="btn-status bg-slate-100 text-slate-400"><i class="fas fa-check"></i></button>
+                <button onclick="setItemStatus(${index}, 'abaikan')" id="btn-a-${index}" class="btn-status bg-slate-100 text-slate-400"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <input type="number" id="input-qty-${index}" value="${item.qty}" class="w-full p-2 border rounded text-sm">
+          `;
+          list.appendChild(div);
+        });
+      }
+
+      document.getElementById('modalEdit').classList.remove('hidden');
+      setTimeout(() => document.getElementById('modalContainer').classList.replace('opacity-0', 'opacity-100'), 10);
+    }
+
+    function setItemStatus(idx, status) {
+      const card = document.getElementById(`item-card-${idx}`);
+      const btnM = document.getElementById(`btn-m-${idx}`);
+      const btnA = document.getElementById(`btn-a-${idx}`);
+      
+      card.classList.remove('status-masuk', 'status-abaikan', 'status-none');
+      card.classList.add('status-' + status);
+      card.dataset.status = status;
+
+      btnM.className = status === 'masuk' ? "btn-status bg-emerald-500 text-white" : "btn-status bg-slate-100 text-slate-400";
+      btnA.className = status === 'abaikan' ? "btn-status bg-red-500 text-white" : "btn-status bg-slate-100 text-slate-400";
+    }
+
+    function closeModal() {
+      document.getElementById('modalEdit').classList.add('hidden');
+    }
+
+    async function submitStokKeluar() {
+      if (isSubmitting) return;
+      const cards = document.querySelectorAll('.item-card');
+      const dataToShip = [];
+      const inv = currentSelectedTransaction.invoice.trim();
+      
+      cards.forEach((card, idx) => {
+        const status = card.dataset.status;
+        if (status !== 'none') {
+          const qty = document.getElementById(`input-qty-${idx}`).value;
+          const name = currentSelectedTransaction.items[idx].nama;
+          dataToShip.push([new Date().toLocaleString('id-ID'), inv, name, qty, status === 'masuk' ? "MASUK" : "ABAIKAN"]);
+        }
+      });
+
+      if (dataToShip.length === 0) return showToast("Pilih status item!", true);
+
+      isSubmitting = true;
+      showToast("Mengirim data...");
+      try {
+        await fetch(SCRIPT_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(dataToShip) });
+        showToast("Berhasil disimpan!");
+        closeModal();
+        fetchPenjualanData();
+      } catch (e) {
+        showToast("Gagal!", true);
+      } finally {
+        isSubmitting = false;
       }
     }
 
-    window.onload = () => {
-      document.getElementById('stokBody').innerHTML = `
-        <tr class="hover:bg-slate-50"><td class="px-4 py-4">Database sedang disinkronkan...</td><td class="px-4 py-4">-</td><td class="px-4 py-4 text-xs italic text-slate-400">Silakan ke tab Penjualan</td></tr>
-      `;
-    };
+    // LOGIKA TAB RIWAYAT & STOK (SUPABASE)
+    async function loadRiwayat() {
+      const { data } = await _supabase.from('riwayat').select('*').order('created_at', { ascending: false }).limit(50);
+      masterRiwayat = data || [];
+      renderRiwayat(masterRiwayat);
+      dataLoaded.riwayat = true;
+    }
+
+    function renderRiwayat(items) {
+      const container = document.getElementById('listRiwayat');
+      container.innerHTML = items.map(row => `
+        <div class="glass-card p-3 text-sm border-l-4 ${row.jenis === 'Barang Masuk' ? 'border-green-500' : 'border-red-500'}">
+          <div class="flex justify-between text-[10px] font-bold mb-1">
+            <span class="text-indigo-600">${new Date(row.created_at).toLocaleDateString()}</span>
+            <span class="${row.jenis === 'Barang Masuk' ? 'text-green-600' : 'text-red-600'}">${row.jenis}</span>
+          </div>
+          <div class="flex justify-between items-end">
+            <div>
+              <div class="font-bold text-slate-700">${row.nama_barang}</div>
+              <div class="text-[9px] text-gray-400">${row.keterangan || '-'}</div>
+            </div>
+            <div class="font-black text-lg text-indigo-700">${row.jumlah}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    async function loadStok() {
+      const { data } = await _supabase.from('stok').select('*').order('nama', { ascending: true });
+      const tbody = document.getElementById('tableStok');
+      const dl = document.getElementById('produkList');
+      tbody.innerHTML = ''; dl.innerHTML = '';
+      data.forEach(item => {
+        tbody.innerHTML += `<tr class="hover:bg-slate-50"><td class="px-4 py-4 text-sm font-medium">${item.nama}</td><td class="px-4 py-4 text-right font-bold">${item.sisa}</td></tr>`;
+        dl.innerHTML += `<option value="${item.nama}">`;
+      });
+      dataLoaded.stok = true;
+    }
+
+    // UTILS
+    function parseCSV(text) {
+      return text.split(/\r?\n/).map(line => {
+        const res = []; let cur = '', q = false;
+        for (let i = 0; i < line.length; i++) {
+          if (line[i] === '"' && line[i+1] === '"') { cur += '"'; i++; }
+          else if (line[i] === '"') q = !q;
+          else if (line[i] === ',' && !q) { res.push(cur); cur = ''; }
+          else cur += line[i];
+        }
+        res.push(cur); return res;
+      });
+    }
+
+    window.onload = () => { addItemRow(); showTab('input'); };
   </script>
 </body>
 </html>
