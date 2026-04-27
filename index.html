@@ -23,6 +23,12 @@
     .status-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
     
     .btn-status { width: 32px; height: 32px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.75rem; }
+
+    /* Filter UI styling */
+    .filter-chip { padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+    .filter-chip.active { background: #6366f1; color: white; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); }
+    .filter-chip.inactive { background: #f1f5f9; color: #64748b; }
+    .filter-chip.inactive:hover { background: #e2e8f0; }
   </style>
 </head>
 <body class="p-4 md:p-8">
@@ -70,7 +76,21 @@
     <!-- Content: Penjualan -->
     <div id="content-penjualan" class="p-4 md:p-6 hidden">
       <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 class="text-2xl font-bold text-slate-800">Daftar Transaksi Penjualan</h2>
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800">Daftar Transaksi Penjualan</h2>
+          <!-- Filter Chips -->
+          <div class="flex gap-2 mt-3">
+            <div id="filter-pending" onclick="setSalesFilter('pending')" class="filter-chip active">
+              <i class="fas fa-clock mr-1"></i> Belum
+            </div>
+            <div id="filter-done" onclick="setSalesFilter('done')" class="filter-chip inactive">
+              <i class="fas fa-check-double mr-1"></i> Selesai
+            </div>
+            <div id="filter-all" onclick="setSalesFilter('all')" class="filter-chip inactive">
+              Semua
+            </div>
+          </div>
+        </div>
         <button onclick="fetchPenjualanData()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition shadow-md">
           <i class="fas fa-sync-alt mr-2" id="syncIconPenjualan"></i>Refresh & Sinkronisasi
         </button>
@@ -140,6 +160,7 @@
     let processedInvoices = new Set(); 
     let storedItemsLog = new Set(); // Format: "Invoice|NamaProduk"
     let isSubmitting = false;
+    let currentSalesFilter = 'pending'; // Default filter ke 'pending' (Belum)
 
     function switchTab(tab) {
       document.getElementById('content-stok').classList.toggle('hidden', tab !== 'stok');
@@ -147,6 +168,27 @@
       document.getElementById('tab-stok').classList.toggle('active', tab === 'stok');
       document.getElementById('tab-penjualan').classList.toggle('active', tab === 'penjualan');
       if (tab === 'penjualan' && !window.penjualanLoaded) fetchPenjualanData();
+    }
+
+    function setSalesFilter(filter) {
+      currentSalesFilter = filter;
+      
+      // Update UI Chips
+      ['pending', 'done', 'all'].forEach(f => {
+        const chip = document.getElementById(`filter-${f}`);
+        if (f === filter) {
+          chip.classList.add('active');
+          chip.classList.remove('inactive');
+        } else {
+          chip.classList.add('inactive');
+          chip.classList.remove('active');
+        }
+      });
+
+      // Re-render table
+      if (window.lastSalesData) {
+        renderPenjualan(window.lastSalesData);
+      }
     }
 
     function showToast(msg, isError = false) {
@@ -170,7 +212,6 @@
       
       try {
         const items = JSON.parse(jsonStr);
-        // Memastikan normalisasi nama produk saat pengecekan
         const filteredItems = items.filter(item => !storedItemsLog.has(`${invoice.trim()}|${item.nama.trim()}`));
         
         currentSelectedTransaction = { invoice, items: filteredItems };
@@ -347,7 +388,6 @@
         
         storedItemsLog.clear();
         historyData.forEach(row => {
-          // row[1] adalah Invoice, row[2] adalah Produk
           if (row[1] && row[2]) {
             storedItemsLog.add(`${row[1].toString().trim()}|${row[2].toString().trim()}`);
           }
@@ -364,7 +404,6 @@
             const invoice = row[0].trim();
             try {
                 const items = JSON.parse(row[10]);
-                // Logika: Invoice SELESAI jika setiap item di dalamnya ada di storedItemsLog (baik MASUK RIWAYAT maupun DIABAIKAN)
                 const isAllDone = items.every(i => storedItemsLog.has(`${invoice}|${i.nama.trim()}`));
                 if (isAllDone) {
                     processedInvoices.add(invoice);
@@ -402,12 +441,21 @@
 
     function renderPenjualan(data) {
       const body = document.getElementById('penjualanBody');
-      if (data.length === 0) {
-        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Data kosong.</td></tr>`;
+      
+      // Terapkan Filter
+      let filteredData = data;
+      if (currentSalesFilter === 'pending') {
+        filteredData = data.filter(row => !processedInvoices.has(row[0].trim()));
+      } else if (currentSalesFilter === 'done') {
+        filteredData = data.filter(row => processedInvoices.has(row[0].trim()));
+      }
+
+      if (filteredData.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 italic">Tidak ada data transaksi (${currentSalesFilter === 'pending' ? 'Belum' : (currentSalesFilter === 'done' ? 'Selesai' : 'Semua')}).</td></tr>`;
         return;
       }
       
-      body.innerHTML = data.map(row => {
+      body.innerHTML = filteredData.map(row => {
         const invoice = row[0].trim();
         const jsonDetail = row[10];
         const isProcessed = processedInvoices.has(invoice);
