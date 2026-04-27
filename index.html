@@ -658,6 +658,7 @@ function changePage(direction) {
     const inv = row[0].trim();
     const isProcessed = processedInvoices.has(inv);
     const tanggalSaja = row[1].split(' ')[0]; // Ambil tanggal (YYYY-MM-DD)
+   const namaPelanggan = row[8] || "-"; // Kolom I adalah index ke-8
     const itemsJson = JSON.stringify(row[10]).replace(/'/g, "&apos;");
     
     return `
