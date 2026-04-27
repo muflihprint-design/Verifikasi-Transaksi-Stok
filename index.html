@@ -140,7 +140,7 @@
         </button>
       </div>
       <div class="glass-card p-3 shadow-md">
-        <input type="text" id="searchStok" onkeyup="filterTableStok()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm" placeholder="Cari nama stok...">
+        <input type="text" id="searchStok" oninput="filterTableStok()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm" placeholder="Cari nama stok...">
       </div>
       <div class="glass-card overflow-hidden">
         <table class="w-full">
@@ -685,12 +685,12 @@ async function submitStokKeluar() {
 function filterTableStok() {
   const input = document.getElementById("searchStok");
   const filter = input.value.toUpperCase();
-  const table = document.getElementById("mainTableStok");
-  const tr = table.getElementsByTagName("tr");
+  const tbody = document.getElementById("tableStok"); // Sesuaikan dengan ID di HTML
+  const tr = tbody.getElementsByTagName("tr");
 
-  // Loop semua baris tabel (lewati header di index 0)
-  for (let i = 1; i < tr.length; i++) {
-    const td = tr[i].getElementsByTagName("td")[0]; // Kolom Produk
+  // Loop semua baris di dalam tbody
+  for (let i = 0; i < tr.length; i++) {
+    const td = tr[i].getElementsByTagName("td")[0]; // Kolom Nama Barang
     if (td) {
       const txtValue = td.textContent || td.innerText;
       if (txtValue.toUpperCase().indexOf(filter) > -1) {
@@ -701,7 +701,6 @@ function filterTableStok() {
     }
   }
 }
-
 
     // UTILS
     function parseCSV(text) {
