@@ -192,7 +192,7 @@
                 const csvText = await csvRes.text();
                 sheetPurchases = parseCSV(csvText);
 
-                await fetchVerifiedItems(); // Ambil verifikasi agar hitungan sisa akurat
+                await fetchVerifiedItems();
 
                 updateDashboard();
                 refreshCurrentView();
@@ -275,29 +275,52 @@
 
         function renderBarangMasuk() {
             const container = document.getElementById('list-container');
+            
+            // 1. Filter data hanya untuk transaksi "BARANG MASUK"
             const dataBarangMasuk = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK');
-            const filtered = dataBarangMasuk.filter(t => {
-                const status = (t.barang_masuk || "").toString().toLowerCase();
-                if (currentBMFilter === 'belum') return status !== 'selesai';
-                if (currentBMFilter === 'selesai') return status === 'selesai';
+            
+            // 2. Olah data dengan mengecek status verifikasi real-time
+            const processedData = dataBarangMasuk.map(t => {
+                const target = Number(t.jumlah || 0);
+                const itemName = (t.nama_barang || "").toLowerCase();
+                
+                // Hitung jumlah yang sudah terverifikasi di Google Sheet untuk transaksi ID ini
+                const alreadyVerifiedCount = verifiedItems
+                    .filter(v => v.transaction_id == t.id && v.nama.toLowerCase().includes(itemName))
+                    .reduce((acc, curr) => acc + Number(curr.qty), 0);
+                
+                const sisa = Math.max(0, target - alreadyVerifiedCount);
+                // Status selesai jika sisa 0 ATAU kolom barang_masuk di Supabase sudah manual diset "selesai"
+                const isLunas = sisa === 0 || (t.barang_masuk || "").toString().toLowerCase() === 'selesai';
+                
+                return { ...t, target, sisa, isLunas };
+            });
+
+            // 3. Filter berdasarkan tab yang dipilih user
+            const filtered = processedData.filter(t => {
+                if (currentBMFilter === 'belum') return !t.isLunas;
+                if (currentBMFilter === 'selesai') return t.isLunas;
                 return true;
             });
 
             container.innerHTML = `
                 <div class="space-y-4">
-                    <div class="flex gap-1 bg-slate-100 p-1 rounded-2xl">${['belum', 'selesai', 'semua'].map(f => `<button onclick="setBMFilter('${f}')" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${currentBMFilter === f ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'} uppercase">${f}</button>`).join('')}</div>
+                    <div class="flex gap-1 bg-slate-100 p-1 rounded-2xl">
+                        ${['belum', 'selesai', 'semua'].map(f => `
+                            <button onclick="setBMFilter('${f}')" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${currentBMFilter === f ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'} uppercase">
+                                ${f === 'belum' ? 'Pending' : f}
+                            </button>
+                        `).join('')}
+                    </div>
                     <div class="bg-white rounded-[32px] border overflow-hidden divide-y divide-slate-50 shadow-sm">
-                        ${filtered.length === 0 ? '<div class="p-12 text-center text-slate-400 italic text-[11px]">Belum ada data barang masuk</div>' : filtered.map(t => {
-                            // Hitung sisa target untuk ditampilkan di daftar
-                            const target = Number(t.jumlah || 0);
-                            const itemName = (t.nama_barang || "").toLowerCase();
-                            const alreadyVerified = verifiedItems
-                                .filter(v => v.transaction_id == t.id && v.nama.toLowerCase().includes(itemName))
-                                .reduce((acc, curr) => acc + Number(curr.qty), 0);
-                            const sisa = Math.max(0, target - alreadyVerified);
-                            const isLunas = sisa === 0 || t.barang_masuk === 'selesai';
-
-                            return `
+                        ${filtered.length === 0 ? `
+                            <div class="p-12 text-center">
+                                <div class="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i data-lucide="package-search" class="w-6 h-6 text-slate-300"></i>
+                                </div>
+                                <p class="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Tidak ada data ${currentBMFilter}</p>
+                            </div>
+                        ` : filtered.map(t => `
                             <div onclick="showDetailModal('${t.nama_barang}', '${t.jumlah || 0}', '${t.id}')" class="p-5 flex justify-between items-center hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer group">
                                 <div class="flex-1">
                                     <p class="text-[9px] text-slate-400 font-bold mb-1">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
@@ -305,18 +328,19 @@
                                     <div class="flex flex-wrap items-center gap-2 mt-2">
                                         <p class="text-[10px] text-blue-700 font-black bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-100 truncate max-w-[150px]">📦 ${t.nama_barang || '-'}</p>
                                         <div class="flex items-center gap-1.5">
-                                            <span class="text-[11px] font-black text-slate-400">Target x${target}</span>
-                                            ${!isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">Sisa x${sisa}</span>` : ''}
+                                            <span class="text-[11px] font-black text-slate-400">Target x${t.target}</span>
+                                            ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">Sisa x${t.sisa}</span>` : ''}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 ml-2 shrink-0">
-                                    <span class="px-2.5 py-1 rounded-xl text-[8px] font-black uppercase ${isLunas ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}">
-                                        ${isLunas ? 'Selesai' : 'Pending'}
+                                    <span class="px-2.5 py-1 rounded-xl text-[8px] font-black uppercase ${t.isLunas ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}">
+                                        ${t.isLunas ? 'Selesai' : 'Pending'}
                                     </span>
                                     <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
                                 </div>
-                            </div>`}).join('')}
+                            </div>
+                        `).join('')}
                     </div>
                 </div>`;
             lucide.createIcons();
@@ -417,7 +441,6 @@
                 listContainer.innerHTML = hasItemsToShow ? htmlContent : `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Semua nota belanja terkait sudah diproses.</div>`;
             }
             
-            // Footer akan muncul jika target sisa > 0
             if (baseRemainingQty > 0) {
                 footer.classList.remove('hidden');
                 document.getElementById('btn-shortage-mode').innerText = "Lunasi Sisa";
@@ -493,7 +516,6 @@
             const btn = document.getElementById('btn-save-verification');
             const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
             
-            // Validasi: jika tidak ada pilihan dan bukan mode shortage, jangan simpan
             if (selectedItemsForSync.length === 0 && !isShortageMode) return;
 
             btn.disabled = true;
@@ -525,7 +547,6 @@
                 };
             });
 
-            // Jika mode paksa lunas (Shortage) diaktifkan dan masih ada sisa
             if (isShortageMode && totalSelectedQty < baseRemainingQty) {
                 const shortageDiff = baseRemainingQty - totalSelectedQty;
                 itemsToSave.push({
