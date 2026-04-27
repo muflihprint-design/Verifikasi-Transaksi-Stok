@@ -810,7 +810,21 @@ function filterTableStok() {
       });
     }
 
-    window.onload = () => { addItemRow(); showTab('input'); };
+     function initRealtime() {
+  _supabase.channel('db-changes')
+    // Listener untuk tabel Stok (Tetap ada)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stok' }, () => {
+      if (!isProcessing) loadStok();
+    })
+    // Listener untuk tabel Riwayat (Baru: Menggantikan antrian)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat' }, () => {
+      if (!isProcessing) loadRiwayat();
+    })
+    .subscribe();
+}
+
+    window.onload = () => { addItemRow(); loadStok(); initRealtime(); };
+
   </script>
 </body>
 </html>
