@@ -122,29 +122,30 @@
     </div>
 
 <div id="tab-riwayat" class="hidden space-y-4">
-  <div class="glass-card p-4 shadow-md">
-    <input type="text" id="searchRiwayat" onkeyup="filterRiwayat()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm mb-3" placeholder="Cari riwayat...">
-    
-    <div class="flex gap-2 mb-3">
-      <input type="date" id="dateStart" onchange="filterRiwayat()" class="flex-1 p-2 bg-gray-50 border rounded-lg text-[10px]">
-      <input type="date" id="dateEnd" onchange="filterRiwayat()" class="flex-1 p-2 bg-gray-50 border rounded-lg text-[10px]">
-    </div>
-
-    <div class="flex gap-2">
-      <button onclick="setFilterDate('today')" id="btnFilterToday" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold">HARI INI</button>
-      <button onclick="setFilterDate('all')" id="btnFilterAll" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-[10px] font-bold">SEMUA</button>
-    </div>
-  </div>
-
-  <div id="listRiwayat" class="space-y-2"></div>
-
-  <div id="paginationRiwayat" class="hidden flex justify-between items-center bg-white p-3 rounded-xl shadow-md mt-4">
-    <button id="btnPrev" onclick="changePage(-1)" class="p-2 text-indigo-600 disabled:text-gray-300">
-      <i class="fas fa-chevron-left"></i>
+      <div class="glass-card p-4 shadow-md">
+        <div class="relative mb-3">
+          <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+          <input type="text" id="searchRiwayat" onkeyup="filterRiwayat()" class="w-full pl-10 p-2 bg-gray-100 border-none rounded-lg text-sm" placeholder="Cari barang...">
+        </div>
+        <div class="flex items-center gap-2 text-[10px] mb-3">
+          <input type="date" id="dateStart" onchange="filterRiwayat()" class="border rounded p-1 w-full text-gray-600">
+          <span>s/d</span>
+          <input type="date" id="dateEnd" onchange="filterRiwayat()" class="border rounded p-1 w-full text-gray-600">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="setFilterDate('today')" id="btnFilterToday" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold transition">HARI INI</button>
+          <button onclick="setFilterDate('month')" id="btnFilterMonth" class="flex-1 bg-indigo-50 text-indigo-600 py-2 rounded-lg text-[10px] font-bold hover:bg-indigo-100 transition">BULAN INI</button>
+          <button onclick="setFilterDate('all')" id="btnFilterAll" class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-[10px] font-bold hover:bg-gray-200 transition">SEMUA</button>
+        </div>
+      </div>
+      <div id="listRiwayat" class="space-y-2"></div>
+  <div id="paginationRiwayat" class="flex items-center justify-between py-4 hidden">
+    <button onclick="changePage(-1)" id="btnPrev" class="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold disabled:opacity-30">
+      <i class="fas fa-chevron-left mr-1"></i> SEBELUMNYA
     </button>
-    <span id="pageIndicator" class="text-[10px] font-bold text-slate-500 uppercase"></span>
-    <button id="btnNext" onclick="changePage(1)" class="p-2 text-indigo-600 disabled:text-gray-300">
-      <i class="fas fa-chevron-right"></i>
+    <span id="pageIndicator" class="text-[10px] font-bold text-white uppercase tracking-widest">Hal 1</span>
+    <button onclick="changePage(1)" id="btnNext" class="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold disabled:opacity-30">
+      BERIKUTNYA <i class="fas fa-chevron-right ml-1"></i>
     </button>
   </div>
 </div>
