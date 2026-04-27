@@ -98,6 +98,20 @@
         <input type="text" id="searchPenjualan" onkeyup="renderPenjualan(window.lastSalesData)" 
            class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm mb-3" 
            placeholder="Cari Invoice atau Nama Barang...">
+
+        <div class="glass-card p-4 shadow-md mb-4">
+  <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Abaikan Massal Berdasarkan Tanggal</label>
+  <div class="flex items-center gap-2 mb-3">
+    <input type="date" id="bulkDateStart" class="flex-1 p-2 bg-gray-100 border-none rounded-lg text-xs">
+    <span class="text-white text-xs">s/d</span>
+    <input type="date" id="bulkDateEnd" class="flex-1 p-2 bg-gray-100 border-none rounded-lg text-xs">
+  </div>
+  <button onclick="executeBulkAbaikanByDate()" class="w-full bg-red-600 text-white py-3 rounded-xl text-[10px] font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition">
+    <i class="fas fa-trash-alt"></i> ABAIKAN TRANSAKSI PADA RENTANG TANGGAL
+  </button>
+</div>
+
+        
         
         <div class="flex gap-2 mb-2 overflow-x-auto pb-2">
           <div id="filter-pending" onclick="setSalesFilter('pending')" class="filter-chip active">Belum</div>
@@ -249,6 +263,70 @@ const itemsPerPage = 10; // Jumlah item per halaman
 
     // --- FUNGSI UI & INDICATOR ---
 
+    async function executeBulkAbaikanByDate() {
+  const startDate = document.getElementById('bulkDateStart').value;
+  const endDate = document.getElementById('bulkDateEnd').value;
+
+  if (!startDate || !endDate) {
+    return showToast("Pilih rentang tanggal terlebih dahulu!", true);
+  }
+
+  // 1. Filter data penjualan yang BELUM diproses dan berada dalam rentang tanggal
+  const targetData = window.lastSalesData.filter(row => {
+    const inv = row[0].trim();
+    const tgl = row[1].split(' ')[0]; // Ambil YYYY-MM-DD dari kolom tanggal
+    
+    const isPending = !processedInvoices.has(inv);
+    const isInRange = (tgl >= startDate && tgl <= endDate);
+    
+    return isPending && isInRange;
+  });
+
+  if (targetData.length === 0) {
+    return showToast("Tidak ada transaksi pending pada tanggal tersebut.", true);
+  }
+
+  if (!confirm(`Terdapat ${targetData.length} transaksi pending di rentang ini. Abaikan semua?`)) return;
+
+  const dataToShip = [];
+  const nowTimestamp = new Date().toLocaleString('id-ID');
+
+  // 2. Susun data untuk dikirim ke Sheets
+  targetData.forEach(row => {
+    const inv = row[0].trim();
+    try {
+      const items = JSON.parse(row[10]);
+      items.forEach(item => {
+        dataToShip.push([nowTimestamp, inv, item.nama.trim(), item.qty, "ABAIKAN"]);
+      });
+    } catch (e) {
+      console.error("Error parsing items for invoice: " + inv);
+    }
+  });
+
+  // 3. Eksekusi Pengiriman
+  showToast(`Memproses ${targetData.length} transaksi...`);
+  
+  try {
+    await fetch(SCRIPT_WEB_APP_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      body: JSON.stringify(dataToShip) 
+    });
+
+    showToast("Berhasil mengabaikan transaksi terpilih!");
+    
+    // Refresh data untuk memperbarui tampilan tabel
+    fetchPenjualanData(); 
+
+  } catch (err) {
+    console.error(err);
+    showToast("Gagal: " + err.message, true);
+  } finally {
+    setTimeout(hideToast, 2000);
+  }
+}
+    
 function setProcessingState(isProcessing) {
   const btn = document.getElementById('btnSubmitForm');
   const iconSave = document.getElementById('iconSave');
