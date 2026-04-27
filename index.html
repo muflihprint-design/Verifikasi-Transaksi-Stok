@@ -158,7 +158,10 @@
         </button>
       </div>
       <div class="glass-card p-3 shadow-md">
-        <input type="text" id="searchStok" oninput="filterTableStok()" class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm" placeholder="Cari nama stok...">
+        <input type="text" id="searchStok" 
+       oninput="renderStok(masterStok)" 
+       class="w-full p-2 bg-gray-100 border-none rounded-lg text-sm" 
+       placeholder="Cari nama stok...">
       </div>
       <div class="glass-card overflow-hidden">
         <table class="w-full">
@@ -223,7 +226,9 @@
     let processedInvoices = new Set(); 
     let storedItemsLog = new Set();
     let currentSelectedTransaction = null;
-    let filteredRiwayat = [];
+    let masterStok = [];
+
+    
 let currentPage = 1;
 const itemsPerPage = 10; // Jumlah item per halaman
 
@@ -348,22 +353,39 @@ function hideToast() {
 
 
 function updatePaginationView() {
+  const q = document.getElementById('searchRiwayat').value.toLowerCase();
+  const s = document.getElementById('dateStart').value;
+  const e = document.getElementById('dateEnd').value;
+  
+  // 1. Lakukan filtering langsung dari masterRiwayat
+  const itemsTerfilter = masterRiwayat.filter(item => {
+    const tgl = item.created_at.split('T')[0];
+    const matchQuery = item.nama_barang.toLowerCase().includes(q) || 
+                       (item.keterangan && item.keterangan.toLowerCase().includes(q));
+    const matchDate = (!s || tgl >= s) && (!e || tgl <= e);
+    return matchQuery && matchDate;
+  });
+  
+  // 2. Hitung index untuk pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedItems = filteredRiwayat.slice(startIndex, endIndex);
+  const paginatedItems = itemsTerfilter.slice(startIndex, endIndex);
   
-  // Tampilkan/Sembunyikan navigasi pagination
+  // 3. Kontrol Navigasi Pagination
   const nav = document.getElementById('paginationRiwayat');
-  if (filteredRiwayat.length > itemsPerPage) {
+  const totalPages = Math.ceil(itemsTerfilter.length / itemsPerPage);
+
+  if (itemsTerfilter.length > itemsPerPage) {
     nav.classList.remove('hidden');
-    document.getElementById('pageIndicator').innerText = `Hal ${currentPage} / ${Math.ceil(filteredRiwayat.length / itemsPerPage)}`;
+    document.getElementById('pageIndicator').innerText = `Hal ${currentPage} / ${totalPages}`;
     document.getElementById('btnPrev').disabled = currentPage === 1;
-    document.getElementById('btnNext').disabled = endIndex >= filteredRiwayat.length;
+    document.getElementById('btnNext').disabled = endIndex >= itemsTerfilter.length;
   } else {
     nav.classList.add('hidden');
   }
   
-  renderRiwayat(paginatedItems);
+  // 4. Panggil render dengan status kosong jika itemsTerfilter.length === 0
+  renderRiwayat(paginatedItems, itemsTerfilter.length === 0, q);
 }
 
 // Fungsi pembantu untuk pindah halaman
@@ -779,30 +801,23 @@ async function submitStokKeluar() {
         </div>`).join('');
     }
 
-    async function loadStok() {
-      const { data } = await _supabase.from('stok').select('*').order('nama', { ascending: true });
-      const tbody = document.getElementById('tableStok');
-      const dl = document.getElementById('produkList');
-      tbody.innerHTML = ''; dl.innerHTML = '';
-
-      if (!data || data.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="2" class="px-4 py-10 text-center text-slate-400 italic text-sm">
-          <i class="fas fa-box-open mb-2 text-2xl block opacity-20"></i>
-          Belum ada data stok tersedia.
-        </td>
-      </tr>`;
-    dataLoaded.stok = true;
+ async function loadStok() {
+  const { data, error } = await _supabase.from('stok').select('*').order('nama', { ascending: true });
+  
+  if (error) {
+    console.error("Error loading stok:", error);
     return;
   }
-      
-      data.forEach(item => {
-        tbody.innerHTML += `<tr class="hover:bg-slate-50"><td class="px-4 py-4 text-sm font-medium">${item.nama}</td><td class="px-4 py-4 text-right font-bold">${item.sisa}</td></tr>`;
-        dl.innerHTML += `<option value="${item.nama}">`;
-      });
-      dataLoaded.stok = true;
-    }
+
+  masterStok = data || []; // Simpan data ke variabel global
+  
+  // Update datalist untuk autocomplete di input
+  const dl = document.getElementById('produkList');
+  dl.innerHTML = masterStok.map(item => `<option value="${item.nama}">`).join('');
+  
+  renderStok(masterStok); // Panggil fungsi render
+  dataLoaded.stok = true;
+}
 
       async function recalculateStock() {
   if (!confirm("Fitur ini akan menghitung ulang seluruh saldo stok berdasarkan Riwayat Transaksi. Lanjutkan?")) return;
@@ -878,36 +893,38 @@ async function submitStokKeluar() {
   }
 }
     
-function filterTableStok() {
-  const input = document.getElementById("searchStok");
-  const filter = input.value.toUpperCase();
-  const tbody = document.getElementById("tableStok"); // Sesuaikan dengan ID di HTML
-  const tr = tbody.getElementsByTagName("tr");
+function renderStok(data) {
+  const tbody = document.getElementById('tableStok');
+  const searchTerm = document.getElementById('searchStok').value.toUpperCase();
 
-  // Loop semua baris di dalam tbody
-  for (let i = 0; i < tr.length; i++) {
-    const td = tr[i].getElementsByTagName("td")[0]; // Kolom Nama Barang
-    if (td) {
-      const txtValue = td.textContent || td.innerText;
-      if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        tr[i].style.display = "";
-      } else {
-        tr[i].style.display = "none";
-      }
-    }
+  // Filter data berdasarkan input pencarian
+  const filteredData = data.filter(item => 
+    item.nama.toUpperCase().includes(searchTerm)
+  );
+
+  // Jika hasil filter kosong
+  if (filteredData.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="2" class="px-4 py-10 text-center text-slate-400 italic text-sm">
+          <i class="fas fa-box-open mb-2 text-2xl block opacity-20"></i><br>
+          ${searchTerm ? `Barang "${searchTerm}" tidak ditemukan.` : 'Belum ada data stok.'}
+        </td>
+      </tr>`;
+    return;
   }
 
-  if (visibleCount === 0) {
-    const noDataRow = document.createElement("tr");
-    noDataRow.id = "no-data-stok";
-    noDataRow.innerHTML = `
-      <td colspan="2" class="px-4 py-8 text-center text-slate-400 italic text-sm">
-        Barang "${input.value}" tidak ditemukan.
-      </td>`;
-    tbody.appendChild(noDataRow);
-  }
+  // Render data ke tabel
+  tbody.innerHTML = filteredData.map(item => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="px-4 py-4 text-sm font-medium text-slate-700">${item.nama}</td>
+      <td class="px-4 py-4 text-right font-bold ${item.sisa <= 0 ? 'text-red-500' : 'text-slate-900'}">
+        ${item.sisa}
+      </td>
+    </tr>
+  `).join('');
 }
-
+    
      function updateProgress(percent) {
       document.getElementById('topProgressBar').style.width = percent + '%';
     }
