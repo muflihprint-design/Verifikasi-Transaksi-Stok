@@ -324,10 +324,7 @@
     renderPenjualan(window.lastSalesData);
     dataLoaded.penjualan = true;
 
-    // Hanya tampilkan toast jika ditekan secara manual
-    if (isManual) {
-      showToast("Data Penjualan Diperbarui");
-    }
+   
   } catch (err) {
     showToast("Gagal mengambil data Spreadsheet", true);
   } finally {
