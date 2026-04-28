@@ -130,7 +130,7 @@
                         <i data-lucide="gift" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <p class="text-[10px] font-black text-amber-800 uppercase tracking-tight">Kelebihan Barang (Bonus)</p>
+                        <p class="text-[10px] font-black text-amber-800 uppercase tracking-tight">Kekurangan Barang (Sudah Masuk di awal)</p>
                         <p id="bonus-text" class="text-[9px] text-amber-700 leading-tight"></p>
                     </div>
                 </div>
@@ -501,7 +501,7 @@
                 display.className = `text-sm font-black transition-all ${newRemaining === 0 ? 'text-emerald-400' : 'text-white'}`;
                 if (excess > 0) {
                     bonusAlert.classList.remove('hidden');
-                    bonusText.innerText = `Terpilih x${totalSelectedQty}. Sisa x${excess} dicatat sebagai BONUS.`;
+                    bonusText.innerText = `Terpilih x${totalSelectedQty}. Kurang x${excess} dicatat masuk diawal.`;
                 } else {
                     bonusAlert.classList.add('hidden');
                 }
