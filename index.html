@@ -101,10 +101,7 @@
             </div>
             <div id="modal-body" class="p-6 overflow-y-auto space-y-4 flex-1"></div>
             
-            <!-- Footer dengan Opsi Penyesuaian -->
             <div id="modal-footer" class="p-4 bg-white border-t border-slate-100 hidden space-y-3">
-                
-                <!-- Bonus Alert -->
                 <div id="bonus-alert" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
                     <div class="p-1.5 bg-amber-500 rounded-xl text-white shrink-0">
                         <i data-lucide="gift" class="w-4 h-4"></i>
@@ -115,7 +112,6 @@
                     </div>
                 </div>
 
-                <!-- Opsi Kekurangan/Anggap Sesuai -->
                 <div id="shortage-option" class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
                         <i data-lucide="check-circle" class="w-5 h-5 text-indigo-600"></i>
@@ -157,7 +153,6 @@
         const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
         const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
-        
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZNmMPh3BM6IU9529KSCzxhEMhZlfvwCmjcl8B2aiyFO_JGsNrf2NJGsWEXtDm6wlWaQ/exec"; 
         const SPREADSHEET_ID = "15qzJ3txkTBYNFc09RWUAr5ZKUa_lQcOHKCThwJ3r0Fk";
 
@@ -276,27 +271,22 @@
         function renderBarangMasuk() {
             const container = document.getElementById('list-container');
             
-            // 1. Filter data hanya untuk transaksi "BARANG MASUK"
             const dataBarangMasuk = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK');
             
-            // 2. Olah data dengan mengecek status verifikasi real-time
             const processedData = dataBarangMasuk.map(t => {
                 const target = Number(t.jumlah || 0);
                 const itemName = (t.nama_barang || "").toLowerCase();
                 
-                // Hitung jumlah yang sudah terverifikasi di Google Sheet untuk transaksi ID ini
                 const alreadyVerifiedCount = verifiedItems
                     .filter(v => v.transaction_id == t.id && v.nama.toLowerCase().includes(itemName))
                     .reduce((acc, curr) => acc + Number(curr.qty), 0);
                 
                 const sisa = Math.max(0, target - alreadyVerifiedCount);
-                // Status selesai jika sisa 0 ATAU kolom barang_masuk di Supabase sudah manual diset "selesai"
                 const isLunas = sisa === 0 || (t.barang_masuk || "").toString().toLowerCase() === 'selesai';
                 
                 return { ...t, target, sisa, isLunas };
             });
 
-            // 3. Filter berdasarkan tab yang dipilih user
             const filtered = processedData.filter(t => {
                 if (currentBMFilter === 'belum') return !t.isLunas;
                 if (currentBMFilter === 'selesai') return t.isLunas;
@@ -322,15 +312,25 @@
                             </div>
                         ` : filtered.map(t => `
                             <div onclick="showDetailModal('${t.nama_barang}', '${t.jumlah || 0}', '${t.id}')" class="p-5 flex justify-between items-center hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer group">
-                                <div class="flex-1">
-                                    <p class="text-[9px] text-slate-400 font-bold mb-1">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
-                                    <p class="font-black text-sm text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">${t.ket || t.keterangan || 'Stok Masuk'}</p>
-                                    <div class="flex flex-wrap items-center gap-2 mt-2">
-                                        <p class="text-[10px] text-blue-700 font-black bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-100 truncate max-w-[150px]">📦 ${t.nama_barang || '-'}</p>
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="text-[11px] font-black text-slate-400">Target x${t.target}</span>
-                                            ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">Sisa x${t.sisa}</span>` : ''}
+                                <div class="flex-1 overflow-hidden">
+                                    <p class="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-tight">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
+                                    
+                                    <!-- Nama Barang Ditukar ke Atas sebagai Judul -->
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <div class="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                                            <i data-lucide="box" class="w-3.5 h-3.5"></i>
                                         </div>
+                                        <h4 class="font-black text-sm text-blue-800 uppercase tracking-tight truncate">${t.nama_barang || 'Barang Tanpa Nama'}</h4>
+                                    </div>
+
+                                    <!-- Supplier/Keterangan Ditukar ke Bawah -->
+                                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[90%] mb-2">
+                                        <span class="text-slate-300 mr-1">Ket:</span> ${t.ket || t.keterangan || 'Tanpa Keterangan'}
+                                    </p>
+
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[11px] font-black text-slate-400">TARGET x${t.target}</span>
+                                        ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">SISA x${t.sisa}</span>` : ''}
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 ml-2 shrink-0">
