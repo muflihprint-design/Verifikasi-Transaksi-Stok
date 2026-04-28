@@ -39,7 +39,7 @@
     <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4">
         <div class="flex justify-between items-center">
             <div>
-                <h1 id="page-title" class="text-xl font-black text-slate-800 tracking-tight text-blue-600">BERANDA</h1>
+                <h1 id="page-title" class="text-xl font-black text-slate-800 tracking-tight text-blue-600 uppercase">BERANDA</h1>
                 <p id="current-date" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Memuat tanggal...</p>
             </div>
             <div class="flex gap-2">
@@ -86,6 +86,29 @@
             </div>
         </div>
 
+        <!-- Wrapper Pencarian Khusus Stok Masuk -->
+        <div id="search-wrapper" class="hidden space-y-4">
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                </div>
+                <input 
+                    type="text" 
+                    id="bm-search-input"
+                    oninput="handleBMSearch(this.value)"
+                    placeholder="Cari nama barang..." 
+                    class="w-full bg-slate-100 border-none rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                >
+            </div>
+            <!-- Filter Tabs Tetap Di Sini Agar Tidak Terender Ulang -->
+            <div class="flex gap-1 bg-slate-100 p-1 rounded-2xl" id="filter-tabs-wrapper">
+                <button onclick="setBMFilter('belum')" id="btn-f-belum" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all bg-white shadow-sm text-blue-600 uppercase">Pending</button>
+                <button onclick="setBMFilter('selesai')" id="btn-f-selesai" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all text-slate-500 uppercase">Selesai</button>
+                <button onclick="setBMFilter('semua')" id="btn-f-semua" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all text-slate-500 uppercase">Semua</button>
+            </div>
+        </div>
+
+        <!-- List Container (Hanya untuk daftar kartu) -->
         <div id="list-container" class="hidden space-y-4"></div>
     </main>
 
@@ -161,6 +184,7 @@
         let verifiedItems = [];
         let currentTab = 'beranda';
         let currentBMFilter = 'belum';
+        let bmSearchQuery = "";
         let selectedItemsForSync = [];
         let baseRemainingQty = 0; 
         let currentTransactionContext = null;
@@ -259,8 +283,31 @@
             
             document.getElementById('page-title').innerText = title;
             document.getElementById('dashboard-container').classList.toggle('hidden', tab !== 'beranda');
+            document.getElementById('search-wrapper').classList.toggle('hidden', tab !== 'barang_masuk');
             document.getElementById('list-container').classList.toggle('hidden', tab === 'beranda');
+            
             refreshCurrentView();
+        }
+
+        function handleBMSearch(val) {
+            bmSearchQuery = val.toLowerCase();
+            renderBarangMasuk();
+        }
+
+        function setBMFilter(v) {
+            currentBMFilter = v;
+            // Update UI Tab Filter secara manual agar tidak render ulang input
+            ['belum', 'selesai', 'semua'].forEach(f => {
+                const btn = document.getElementById(`btn-f-${f}`);
+                if (f === v) {
+                    btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                    btn.classList.remove('text-slate-500');
+                } else {
+                    btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                    btn.classList.add('text-slate-500');
+                }
+            });
+            renderBarangMasuk();
         }
 
         function renderRiwayat() {
@@ -270,78 +317,62 @@
 
         function renderBarangMasuk() {
             const container = document.getElementById('list-container');
-            
             const dataBarangMasuk = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK');
             
             const processedData = dataBarangMasuk.map(t => {
                 const target = Number(t.jumlah || 0);
                 const itemName = (t.nama_barang || "").toLowerCase();
-                
                 const alreadyVerifiedCount = verifiedItems
                     .filter(v => v.transaction_id == t.id && v.nama.toLowerCase().includes(itemName))
                     .reduce((acc, curr) => acc + Number(curr.qty), 0);
-                
                 const sisa = Math.max(0, target - alreadyVerifiedCount);
                 const isLunas = sisa === 0 || (t.barang_masuk || "").toString().toLowerCase() === 'selesai';
-                
                 return { ...t, target, sisa, isLunas };
             });
 
             const filtered = processedData.filter(t => {
-                if (currentBMFilter === 'belum') return !t.isLunas;
-                if (currentBMFilter === 'selesai') return t.isLunas;
-                return true;
+                const matchSearch = (t.nama_barang || "").toLowerCase().includes(bmSearchQuery);
+                let matchStatus = true;
+                if (currentBMFilter === 'belum') matchStatus = !t.isLunas;
+                else if (currentBMFilter === 'selesai') matchStatus = t.isLunas;
+                return matchSearch && matchStatus;
             });
 
             container.innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex gap-1 bg-slate-100 p-1 rounded-2xl">
-                        ${['belum', 'selesai', 'semua'].map(f => `
-                            <button onclick="setBMFilter('${f}')" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${currentBMFilter === f ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'} uppercase">
-                                ${f === 'belum' ? 'Pending' : f}
-                            </button>
-                        `).join('')}
-                    </div>
-                    <div class="bg-white rounded-[32px] border overflow-hidden divide-y divide-slate-50 shadow-sm">
-                        ${filtered.length === 0 ? `
-                            <div class="p-12 text-center">
-                                <div class="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i data-lucide="package-search" class="w-6 h-6 text-slate-300"></i>
-                                </div>
-                                <p class="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Tidak ada data ${currentBMFilter}</p>
+                <div class="bg-white rounded-[32px] border overflow-hidden divide-y divide-slate-50 shadow-sm">
+                    ${filtered.length === 0 ? `
+                        <div class="p-12 text-center">
+                            <div class="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="package-search" class="w-6 h-6 text-slate-300"></i>
                             </div>
-                        ` : filtered.map(t => `
-                            <div onclick="showDetailModal('${t.nama_barang}', '${t.jumlah || 0}', '${t.id}')" class="p-5 flex justify-between items-center hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer group">
-                                <div class="flex-1 overflow-hidden">
-                                    <p class="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-tight">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
-                                    
-                                    <!-- Nama Barang Ditukar ke Atas sebagai Judul -->
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <div class="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
-                                            <i data-lucide="box" class="w-3.5 h-3.5"></i>
-                                        </div>
-                                        <h4 class="font-black text-sm text-blue-800 uppercase tracking-tight truncate">${t.nama_barang || 'Barang Tanpa Nama'}</h4>
+                            <p class="text-slate-400 font-bold uppercase text-[10px] tracking-widest">${bmSearchQuery ? 'Barang tidak ditemukan' : 'Tidak ada data ' + currentBMFilter}</p>
+                        </div>
+                    ` : filtered.map(t => `
+                        <div onclick="showDetailModal('${t.nama_barang}', '${t.jumlah || 0}', '${t.id}')" class="p-5 flex justify-between items-center hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer group">
+                            <div class="flex-1 overflow-hidden">
+                                <p class="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-tight">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <div class="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                                        <i data-lucide="box" class="w-3.5 h-3.5"></i>
                                     </div>
-
-                                    <!-- Supplier/Keterangan Ditukar ke Bawah -->
-                                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[90%] mb-2">
-                                        <span class="text-slate-300 mr-1">Ket:</span> ${t.ket || t.keterangan || 'Tanpa Keterangan'}
-                                    </p>
-
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[11px] font-black text-slate-400">TARGET x${t.target}</span>
-                                        ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">SISA x${t.sisa}</span>` : ''}
-                                    </div>
+                                    <h4 class="font-black text-sm text-blue-800 uppercase tracking-tight truncate">${t.nama_barang || 'Barang Tanpa Nama'}</h4>
                                 </div>
-                                <div class="flex items-center gap-3 ml-2 shrink-0">
-                                    <span class="px-2.5 py-1 rounded-xl text-[8px] font-black uppercase ${t.isLunas ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}">
-                                        ${t.isLunas ? 'Selesai' : 'Pending'}
-                                    </span>
-                                    <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
+                                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[90%] mb-2">
+                                    <span class="text-slate-300 mr-1">Ket:</span> ${t.ket || t.keterangan || 'Tanpa Keterangan'}
+                                </p>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-black text-slate-400">TARGET x${t.target}</span>
+                                    ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">SISA x${t.sisa}</span>` : ''}
                                 </div>
                             </div>
-                        `).join('')}
-                    </div>
+                            <div class="flex items-center gap-3 ml-2 shrink-0">
+                                <span class="px-2.5 py-1 rounded-xl text-[8px] font-black uppercase ${t.isLunas ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}">
+                                    ${t.isLunas ? 'Selesai' : 'Pending'}
+                                </span>
+                                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>`;
             lucide.createIcons();
         }
@@ -350,29 +381,21 @@
             const body = document.getElementById('modal-body');
             const title = document.getElementById('modal-title');
             const footer = document.getElementById('modal-footer');
-            
             currentTransactionContext = { itemName, itemQty, transactionId };
             isShortageMode = false;
-            
             title.innerText = "Verifikasi Barang Masuk";
             footer.classList.add('hidden');
             selectedItemsForSync = [];
-
             body.innerHTML = `<div class="flex flex-col items-center justify-center py-16"><div class="loader mb-3"></div><span class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Mencocokkan nota...</span></div>`;
             document.getElementById('modal-container').classList.remove('hidden');
             setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
-
             await fetchVerifiedItems();
-
             const searchQuery = itemName ? itemName.toLowerCase() : "";
             const filteredPurchases = sheetPurchases.filter(p => p.itemRaw.toLowerCase().includes(searchQuery));
-
             const totalAlreadyVerified = verifiedItems
                 .filter(v => v.transaction_id == transactionId && v.nama.toLowerCase().includes(searchQuery))
                 .reduce((acc, curr) => acc + Number(curr.qty), 0);
-            
             baseRemainingQty = Math.max(0, itemQty - totalAlreadyVerified);
-
             body.innerHTML = `
                 <div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6 shadow-2xl relative overflow-hidden">
                     <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full -mr-10 -mt-10 blur-xl"></div>
@@ -386,25 +409,21 @@
                     </div>
                 </div>
                 <div id="purchases-list" class="space-y-4 pb-6"></div>`;
-
             const listContainer = document.getElementById('purchases-list');
             if (filteredPurchases.length === 0) {
-                listContainer.innerHTML = `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Riwayat belanja admin tidak ditemukan.<br>Mohon laporkan jika belanja sudah dilakukan.</div>`;
+                listContainer.innerHTML = `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Riwayat belanja admin tidak ditemukan.</div>`;
             } else {
                 let hasItemsToShow = false;
                 const htmlContent = filteredPurchases.map((p, pIndex) => {
                     let rincianItem = [];
                     try { rincianItem = JSON.parse(p.itemRaw); } catch(e) { rincianItem = null; }
-                    
                     const validItems = Array.isArray(rincianItem) ? rincianItem.filter(it => {
                         const isTarget = it.nama.toLowerCase().includes(searchQuery);
                         const isVerified = verifiedItems.some(v => v.no_transaksi == p.no_transaksi && v.nama == it.nama);
                         return isTarget && !isVerified;
                     }) : [];
-
                     if (validItems.length === 0) return '';
                     hasItemsToShow = true;
-
                     return `
                         <div class="p-5 bg-white border border-slate-100 rounded-[32px] shadow-sm space-y-4">
                             <div class="flex justify-between items-center border-b border-slate-50 pb-3">
@@ -414,14 +433,7 @@
                             <div class="space-y-2">
                                 ${validItems.map((it, itIndex) => {
                                     const uniqueId = `check-${pIndex}-${itIndex}`;
-                                    const itemData = JSON.stringify({ 
-                                        parent_id: transactionId, 
-                                        no_transaksi: p.no_transaksi, 
-                                        nama: it.nama, 
-                                        qty: it.qty, 
-                                        harga: it.harga, 
-                                        waktu: p.waktu 
-                                    }).replace(/"/g, '&quot;');
+                                    const itemData = JSON.stringify({ parent_id: transactionId, no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga, waktu: p.waktu }).replace(/"/g, '&quot;');
                                     return `
                                         <label for="${uniqueId}" class="flex justify-between items-center text-[11px] bg-slate-50/50 border-slate-100 p-3 rounded-2xl border active:scale-[0.98] cursor-pointer group transition-all hover:bg-blue-50/30">
                                             <div class="flex items-center gap-4">
@@ -437,15 +449,9 @@
                             </div>
                         </div>`;
                 }).join('');
-
-                listContainer.innerHTML = hasItemsToShow ? htmlContent : `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Semua nota belanja terkait sudah diproses.</div>`;
+                listContainer.innerHTML = hasItemsToShow ? htmlContent : `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Semua nota sudah diproses.</div>`;
             }
-            
-            if (baseRemainingQty > 0) {
-                footer.classList.remove('hidden');
-                document.getElementById('btn-shortage-mode').innerText = "Lunasi Sisa";
-            }
-            
+            if (baseRemainingQty > 0) footer.classList.remove('hidden');
             lucide.createIcons();
         }
 
@@ -454,9 +460,7 @@
             const display = document.getElementById('remaining-qty-display');
             const bonusAlert = document.getElementById('bonus-alert');
             const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
-            
             isShortageMode = !isShortageMode;
-            
             if (isShortageMode) {
                 btn.innerText = "Batalkan";
                 btn.classList.replace('bg-indigo-600', 'bg-slate-500');
@@ -469,11 +473,9 @@
                 const newRemaining = Math.max(0, baseRemainingQty - totalSelectedQty);
                 display.innerText = newRemaining === 0 ? 'LUNAS' : `x${newRemaining}`;
                 display.className = `text-sm font-black transition-all ${newRemaining === 0 ? 'text-emerald-400' : 'text-white'}`;
-                
                 const excess = Math.max(0, totalSelectedQty - baseRemainingQty);
                 if (excess > 0) bonusAlert.classList.remove('hidden');
             }
-            lucide.createIcons();
         }
 
         function toggleItemCheck(el, dataStr) {
@@ -482,7 +484,6 @@
             const display = document.getElementById('remaining-qty-display');
             const bonusAlert = document.getElementById('bonus-alert');
             const bonusText = document.getElementById('bonus-text');
-
             if (el.checked) {
                 label.classList.add('bg-blue-50', 'border-blue-400', 'ring-2', 'ring-blue-100');
                 label.classList.remove('bg-slate-50/50', 'border-slate-100');
@@ -492,96 +493,48 @@
                 label.classList.add('bg-slate-50/50', 'border-slate-100');
                 selectedItemsForSync = selectedItemsForSync.filter(i => !(i.no_transaksi === data.no_transaksi && i.nama === data.nama));
             }
-
             const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
             const newRemaining = Math.max(0, baseRemainingQty - totalSelectedQty);
             const excess = Math.max(0, totalSelectedQty - baseRemainingQty);
-
             if (!isShortageMode) {
                 display.innerText = newRemaining === 0 ? 'LUNAS' : `x${newRemaining}`;
                 display.className = `text-sm font-black transition-all ${newRemaining === 0 ? 'text-emerald-400' : 'text-white'}`;
-
                 if (excess > 0) {
                     bonusAlert.classList.remove('hidden');
-                    bonusText.innerText = `Terpilih x${totalSelectedQty}. Target x${baseRemainingQty} dipenuhi, sisa x${excess} dicatat sebagai BONUS otomatis.`;
+                    bonusText.innerText = `Terpilih x${totalSelectedQty}. Sisa x${excess} dicatat sebagai BONUS.`;
                 } else {
                     bonusAlert.classList.add('hidden');
                 }
             }
-
-            lucide.createIcons();
         }
 
         async function saveVerifiedItems() {
             const btn = document.getElementById('btn-save-verification');
             const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
-            
             if (selectedItemsForSync.length === 0 && !isShortageMode) return;
-
             btn.disabled = true;
-            btn.innerHTML = `<div class="loader"></div> <span class="ml-3">Memproses Verifikasi...</span>`;
-            
+            btn.innerHTML = `<div class="loader"></div> <span class="ml-3">Memproses...</span>`;
             let cumulativeQty = 0;
             const itemsToSave = selectedItemsForSync.map(item => {
                 const itemQty = Number(item.qty);
                 const startAt = cumulativeQty;
                 cumulativeQty += itemQty;
-                
-                let regularPart = 0;
-                let bonusPart = 0;
-
-                if (startAt >= baseRemainingQty) {
-                    bonusPart = itemQty;
-                } else if (cumulativeQty > baseRemainingQty) {
-                    regularPart = baseRemainingQty - startAt;
-                    bonusPart = itemQty - regularPart;
-                } else {
-                    regularPart = itemQty;
-                }
-
-                return {
-                    ...item,
-                    regular_qty: regularPart,
-                    bonus_qty: bonusPart,
-                    is_bonus: bonusPart > 0
-                };
+                let regularPart = 0, bonusPart = 0;
+                if (startAt >= baseRemainingQty) bonusPart = itemQty;
+                else if (cumulativeQty > baseRemainingQty) { regularPart = baseRemainingQty - startAt; bonusPart = itemQty - regularPart; }
+                else regularPart = itemQty;
+                return { ...item, regular_qty: regularPart, bonus_qty: bonusPart, is_bonus: bonusPart > 0 };
             });
-
             if (isShortageMode && totalSelectedQty < baseRemainingQty) {
                 const shortageDiff = baseRemainingQty - totalSelectedQty;
-                itemsToSave.push({
-                    parent_id: currentTransactionContext.transactionId,
-                    no_transaksi: "VERIF-PENYESUAIAN-LUNAS",
-                    nama: currentTransactionContext.itemName,
-                    qty: shortageDiff,
-                    regular_qty: shortageDiff,
-                    bonus_qty: 0,
-                    is_bonus: false,
-                    is_adjustment: true,
-                    waktu: new Date().toISOString()
-                });
+                itemsToSave.push({ parent_id: currentTransactionContext.transactionId, no_transaksi: "VERIF-LUNAS", nama: currentTransactionContext.itemName, qty: shortageDiff, regular_qty: shortageDiff, bonus_qty: 0, is_bonus: false, is_adjustment: true, waktu: new Date().toISOString() });
             }
-
             try {
-                await fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        action: 'add_verified_items', 
-                        spreadsheet_id: SPREADSHEET_ID, 
-                        items: itemsToSave 
-                    })
-                });
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemsToSave }) });
                 btn.classList.replace('bg-blue-600', 'bg-emerald-600');
-                btn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> Berhasil Diverifikasi`;
-                lucide.createIcons();
+                btn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> Berhasil`;
                 setTimeout(() => { closeModal(); fetchData(); }, 1200);
-            } catch (e) { 
-                btn.disabled = false; 
-                btn.innerHTML = "Gagal Simpan, Coba Lagi"; 
-            }
+            } catch (e) { btn.disabled = false; btn.innerHTML = "Gagal Simpan"; }
         }
 
         function closeModal() {
@@ -605,7 +558,6 @@
         }
 
         function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(n)); }
-        function setBMFilter(v) { currentBMFilter = v; renderBarangMasuk(); }
     </script>
 </body>
 </html>
