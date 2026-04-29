@@ -96,7 +96,7 @@
                     type="text" 
                     id="bm-search-input"
                     oninput="handleBMSearch(this.value)"
-                    placeholder="Cari data..." 
+                    placeholder="Cari No. Transaksi atau Nama Barang..." 
                     class="w-full bg-slate-100 border-none rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-800 outline-none"
                 >
             </div>
@@ -283,15 +283,36 @@
 
         function renderNotaBelanja() {
             const container = document.getElementById('list-container');
+            
             const filtered = sheetPurchases.filter(p => {
-                const match = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery);
+                // Parse items for searching and verification checking
                 let items = [];
                 try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
+                
+                // Cek apakah ada nama barang yang cocok dengan query
+                const matchInItems = items.some(it => it.nama.toLowerCase().includes(bmSearchQuery));
+                const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery);
+                const isMatch = matchInHeader || matchInItems;
+                
+                // Logika Filter Status (Pending/Selesai)
                 const allV = items.length > 0 && items.every(it => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
-                if (currentBMFilter === 'belum') return match && !allV;
-                if (currentBMFilter === 'selesai') return match && allV;
-                return match;
+                
+                if (currentBMFilter === 'belum') return isMatch && !allV;
+                if (currentBMFilter === 'selesai') return isMatch && allV;
+                return isMatch;
             });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                <div class="py-20 text-center space-y-4">
+                    <div class="inline-flex p-4 bg-slate-50 rounded-full text-slate-300">
+                         <i data-lucide="search-x" class="w-10 h-10"></i>
+                    </div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p>
+                </div>`;
+                lucide.createIcons();
+                return;
+            }
 
             container.innerHTML = filtered.map(p => {
                 let items = [];
@@ -314,7 +335,7 @@
                             if (isV) {
                                 const parentBM = allTransactions.find(t => (t.id || t.ID) == vRecord.parent_id);
                                 if (parentBM) {
-                                    const vCount = verifiedItems.filter(v => v.parent_id == parentBM.id || v.parent_id == parentBM.ID)
+                                    const vCount = verifiedItems.filter(v => v.parent_id == (parentBM.id || parentBM.ID))
                                                    .reduce((acc, curr) => acc + Number(curr.qty), 0);
                                     const sisa = Math.max(0, Number(parentBM.jumlah || 0) - vCount);
                                     sisaGudangUI = `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Sisa Gudang: x${sisa}</span>`;
@@ -323,11 +344,14 @@
 
                             const itemDataStr = JSON.stringify({no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;');
                             
+                            // Highlighting matching search results
+                            const isNameMatch = bmSearchQuery && it.nama.toLowerCase().includes(bmSearchQuery);
+
                             return `
                             <div onclick="openStockPicker('${itemDataStr}', ${isV})" 
-                                 class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''}">
+                                 class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isNameMatch ? 'ring-2 ring-blue-400 ring-inset' : ''}">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-bold text-slate-700 uppercase truncate pr-4">${it.nama}</span>
+                                    <span class="text-[10px] font-bold ${isNameMatch ? 'text-blue-700' : 'text-slate-700'} uppercase truncate pr-4">${it.nama}</span>
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-black text-slate-500">x${it.qty}</span>
                                         ${isV ? '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i>' : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}
@@ -371,7 +395,6 @@
                 .map(t => {
                     const id = t.id || t.ID;
                     const target = Number(t.jumlah || 0);
-                    // Hitung total Qty dari spreadsheet (gTransaction ID ada di kolom G / transaction_id)
                     const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id)
                                    .reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
                     const sisa = Math.max(0, target - vCount);
@@ -496,6 +519,11 @@
                     return match;
                 });
 
+            if (filtered.length === 0) {
+                 container.innerHTML = `<div class="py-20 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Barang Masuk Tidak Ditemukan</div>`;
+                 return;
+            }
+
             container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `
                 <div onclick="showDetailGudang('${(t.nama_barang || t.Nama_Barang).replace(/'/g, "\\'")}', '${t.target}', '${t.realId}')" class="p-5 flex justify-between items-center cursor-pointer active:bg-slate-50 transition-colors">
                     <div>
@@ -522,7 +550,6 @@
             body.innerHTML = `<div class="flex justify-center py-12"><div class="loader"></div></div>`;
             await fetchVerifiedItems();
             
-            // Logika baru: Hitung sisa stok berdasarkan Qty di spreadsheet
             const currentVerified = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id);
             const vCount = currentVerified.reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
             baseRemainingQty = Math.max(0, Number(qty) - vCount);
