@@ -77,16 +77,16 @@
                     </div>
                     <span class="text-[10px] font-black text-orange-700 uppercase tracking-wider">Cek Stok Masuk</span>
                 </button>
-                <button onclick="changeTab('riwayat')" class="flex flex-col items-center gap-2 p-5 bg-blue-50 rounded-[28px] border border-blue-100 group active:scale-95 transition-all">
-                    <div class="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-200 group-hover:-rotate-12 transition-transform">
-                        <i data-lucide="history" class="w-6 h-6"></i>
+                <button onclick="changeTab('nota_belanja')" class="flex flex-col items-center gap-2 p-5 bg-indigo-50 rounded-[28px] border border-indigo-100 group active:scale-95 transition-all">
+                    <div class="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200 group-hover:-rotate-12 transition-transform">
+                        <i data-lucide="receipt" class="w-6 h-6"></i>
                     </div>
-                    <span class="text-[10px] font-black text-blue-700 uppercase tracking-wider">Riwayat Kas</span>
+                    <span class="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Nota Belanja</span>
                 </button>
             </div>
         </div>
 
-        <!-- Wrapper Pencarian Khusus Stok Masuk -->
+        <!-- Wrapper Pencarian & Filter -->
         <div id="search-wrapper" class="hidden space-y-4">
             <div class="relative group">
                 <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
@@ -96,11 +96,19 @@
                     type="text" 
                     id="bm-search-input"
                     oninput="handleBMSearch(this.value)"
-                    placeholder="Cari nama barang..." 
+                    placeholder="Cari Barang atau No. Transaksi..." 
                     class="w-full bg-slate-100 border-none rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                 >
             </div>
-            <!-- Filter Tabs Tetap Di Sini Agar Tidak Terender Ulang -->
+
+            <!-- Tombol Aksi Nota -->
+            <div id="nota-actions" class="hidden flex gap-2">
+                <button onclick="openAutoVerifModal()" class="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-100">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    Verifikasi Otomatis
+                </button>
+            </div>
+
             <div class="flex gap-1 bg-slate-100 p-1 rounded-2xl" id="filter-tabs-wrapper">
                 <button onclick="setBMFilter('belum')" id="btn-f-belum" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all bg-white shadow-sm text-blue-600 uppercase">Pending</button>
                 <button onclick="setBMFilter('selesai')" id="btn-f-selesai" class="flex-1 py-2 text-[10px] font-bold rounded-xl transition-all text-slate-500 uppercase">Selesai</button>
@@ -108,7 +116,7 @@
             </div>
         </div>
 
-        <!-- List Container (Hanya untuk daftar kartu) -->
+        <!-- List Container -->
         <div id="list-container" class="hidden space-y-4"></div>
     </main>
 
@@ -125,22 +133,12 @@
             <div id="modal-body" class="p-6 overflow-y-auto space-y-4 flex-1"></div>
             
             <div id="modal-footer" class="p-4 bg-white border-t border-slate-100 hidden space-y-3">
-                <div id="bonus-alert" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
-                    <div class="p-1.5 bg-amber-500 rounded-xl text-white shrink-0">
-                        <i data-lucide="gift" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <p class="text-[10px] font-black text-amber-800 uppercase tracking-tight">Kekurangan Barang (Sudah Masuk di awal)</p>
-                        <p id="bonus-text" class="text-[9px] text-amber-700 leading-tight"></p>
-                    </div>
-                </div>
-
                 <div id="shortage-option" class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
                         <i data-lucide="check-circle" class="w-5 h-5 text-indigo-600"></i>
                         <div>
-                            <p class="text-[10px] text-indigo-800 font-bold uppercase tracking-tight">Kelebihan Barang?</p>
-                            <p class="text-[9px] text-indigo-600 leading-tight">Aktifkan dan anggap bonus</p>
+                            <p class="text-[10px] text-indigo-800 font-bold uppercase tracking-tight">Pelunasan Manual?</p>
+                            <p class="text-[9px] text-indigo-600 leading-tight">Gunakan jika barang sisa tidak ada di nota</p>
                         </div>
                     </div>
                     <button onclick="toggleShortageMode()" id="btn-shortage-mode" class="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl shadow-md active:scale-95 transition-all">Lunasi Sisa</button>
@@ -161,9 +159,9 @@
                 <i data-lucide="layout-grid" class="w-6 h-6"></i>
                 <span class="text-[10px] font-bold uppercase tracking-wider">Mulai</span>
             </button>
-            <button onclick="changeTab('riwayat')" id="nav-riwayat" class="flex flex-col items-center gap-1 text-slate-400">
-                <i data-lucide="history" class="w-6 h-6"></i>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Riwayat</span>
+            <button onclick="changeTab('nota_belanja')" id="nav-nota_belanja" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="receipt" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Nota</span>
             </button>
             <button onclick="changeTab('barang_masuk')" id="nav-barang_masuk" class="flex flex-col items-center gap-1 text-slate-400">
                 <i data-lucide="package-search" class="w-6 h-6"></i>
@@ -205,21 +203,17 @@
                     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
                 });
                 const data = await response.json();
-                if (Array.isArray(data)) allTransactions = data.sort((a, b) => (b.id || 0) - (a.id || 0));
-
+                if (Array.isArray(data)) {
+                    allTransactions = data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+                }
                 const csvRes = await fetch(CSV_URL);
                 const csvText = await csvRes.text();
                 sheetPurchases = parseCSV(csvText);
-
                 await fetchVerifiedItems();
-
                 updateDashboard();
                 refreshCurrentView();
-            } catch (err) { 
-                console.error("Gagal Ambil Data:", err); 
-            } finally { 
-                indicator.classList.add('hidden'); 
-            }
+            } catch (err) { console.error("Gagal Ambil Data:", err); } 
+            finally { indicator.classList.add('hidden'); }
         }
 
         async function fetchVerifiedItems() {
@@ -227,9 +221,7 @@
                 const res = await fetch(`${APPS_SCRIPT_URL}?spreadsheet_id=${SPREADSHEET_ID}`);
                 const result = await res.json();
                 verifiedItems = result.data || [];
-            } catch (e) {
-                verifiedItems = [];
-            }
+            } catch (e) { verifiedItems = []; }
         }
 
         function parseCSV(text) {
@@ -243,10 +235,8 @@
                 let inQuotes = false, currentValue = '';
                 for (let j = 0; j < line.length; j++) {
                     const char = line[j];
-                    if (char === '"') {
-                        if (inQuotes && line[j+1] === '"') { currentValue += '"'; j++; }
-                        else inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) { row.push(currentValue.trim()); currentValue = ''; }
+                    if (char === '"') { if (inQuotes && line[j+1] === '"') { currentValue += '"'; j++; } else inQuotes = !inQuotes; }
+                    else if (char === ',' && !inQuotes) { row.push(currentValue.trim()); currentValue = ''; }
                     else currentValue += char;
                 }
                 row.push(currentValue.trim());
@@ -258,11 +248,14 @@
         }
 
         function refreshCurrentView() {
-            ['beranda', 'riwayat', 'barang_masuk'].forEach(t => {
+            ['beranda', 'nota_belanja', 'barang_masuk'].forEach(t => {
                 const nav = document.getElementById('nav-' + t);
                 if (nav) nav.classList.toggle('nav-active', currentTab === t);
             });
-            if (currentTab === 'riwayat') renderRiwayat();
+            
+            document.getElementById('nota-actions').classList.toggle('hidden', currentTab !== 'nota_belanja');
+
+            if (currentTab === 'nota_belanja') renderNotaBelanja();
             else if (currentTab === 'barang_masuk') renderBarangMasuk();
             lucide.createIcons();
         }
@@ -278,283 +271,370 @@
         function changeTab(tab) {
             currentTab = tab;
             let title = tab.replace('_', ' ').toUpperCase();
-            if (title === "RIWAYAT") title = "RIWAYAT KAS";
+            if (title === "NOTA BELANJA") title = "NOTA PEMBELIAN";
             if (title === "BARANG MASUK") title = "STOK MASUK";
-            
             document.getElementById('page-title').innerText = title;
             document.getElementById('dashboard-container').classList.toggle('hidden', tab !== 'beranda');
-            document.getElementById('search-wrapper').classList.toggle('hidden', tab !== 'barang_masuk');
+            document.getElementById('search-wrapper').classList.toggle('hidden', tab === 'beranda');
             document.getElementById('list-container').classList.toggle('hidden', tab === 'beranda');
-            
             refreshCurrentView();
         }
 
         function handleBMSearch(val) {
             bmSearchQuery = val.toLowerCase();
-            renderBarangMasuk();
+            if (currentTab === 'nota_belanja') renderNotaBelanja();
+            else renderBarangMasuk();
         }
 
         function setBMFilter(v) {
             currentBMFilter = v;
-            // Update UI Tab Filter secara manual agar tidak render ulang input
             ['belum', 'selesai', 'semua'].forEach(f => {
                 const btn = document.getElementById(`btn-f-${f}`);
-                if (f === v) {
-                    btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-                    btn.classList.remove('text-slate-500');
-                } else {
-                    btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
-                    btn.classList.add('text-slate-500');
-                }
+                if (f === v) btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                else btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
             });
-            renderBarangMasuk();
+            if (currentTab === 'nota_belanja') renderNotaBelanja();
+            else renderBarangMasuk();
         }
 
-        function renderRiwayat() {
+        function renderNotaBelanja() {
             const container = document.getElementById('list-container');
-            container.innerHTML = `<div class="bg-white rounded-[32px] border p-4 shadow-sm space-y-3">${allTransactions.slice(0, 50).map(t => renderCard(t)).join('')}</div>`;
+            const filtered = sheetPurchases.filter(p => {
+                const matchMeta = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery);
+                let rincian = [];
+                try { rincian = JSON.parse(p.itemRaw); } catch(e) {}
+                const matchItemName = rincian.some(item => item.nama.toLowerCase().includes(bmSearchQuery));
+                const isMatchSearch = matchMeta || matchItemName;
+                const allVerified = rincian.every(item => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === item.nama));
+                if (currentBMFilter === 'belum') return isMatchSearch && !allVerified;
+                if (currentBMFilter === 'selesai') return isMatchSearch && allVerified;
+                return isMatchSearch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="p-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Tidak ada nota ditemukan</div>`;
+                return;
+            }
+
+            container.innerHTML = `<div class="space-y-4">${filtered.map(p => `
+                <div class="bg-white rounded-[32px] border p-5 shadow-sm space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${p.waktu}</p>
+                            <h4 class="font-black text-slate-800 text-sm">${p.no_transaksi}</h4>
+                        </div>
+                        <span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-xl text-[10px] font-black">-${formatRupiah(p.keluar)}</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${JSON.parse(p.itemRaw).map(item => {
+                            const isV = verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === item.nama);
+                            return `
+                                <div onclick="openVerifFromNota('${item.nama}', '${item.qty}', '${p.no_transaksi}')" class="flex justify-between items-center p-3 rounded-2xl border ${isV ? 'bg-emerald-50 border-emerald-100 opacity-60' : 'bg-slate-50 border-slate-100 active:scale-95'} cursor-pointer">
+                                    <span class="text-[11px] font-bold text-slate-700 uppercase truncate pr-4">${item.nama}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-black text-slate-500">x${item.qty}</span>
+                                        ${isV ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>' : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('')}</div>`;
+            lucide.createIcons();
+        }
+
+        async function openVerifFromNota(itemName, qty, noNota) {
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+            footer.classList.add('hidden');
+            document.getElementById('modal-container').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
+            body.innerHTML = `<div class="flex flex-col items-center py-16"><div class="loader"></div></div>`;
+
+            const searchTerms = itemName.toLowerCase().split(' ').filter(word => word.length > 2);
+            const possibleTargets = allTransactions.filter(t => {
+                const j = (t.Jenis || t.jenis || "").toString().toUpperCase();
+                if (j !== 'BARANG MASUK') return false;
+                const n = (t.nama_barang || t.Nama_Barang || "").toLowerCase();
+                return searchTerms.some(term => n.includes(term));
+            }).map(t => {
+                const id = t.id || t.ID;
+                const count = verifiedItems.filter(v => v.parent_id == id || v.transaction_id == id).reduce((acc, curr) => acc + Number(curr.qty), 0);
+                return { ...t, target: Number(t.jumlah || 0), sisa: Math.max(0, Number(t.jumlah || 0) - count), realId: id };
+            });
+
+            if (possibleTargets.length === 0) {
+                body.innerHTML = `<div class="text-center py-10"><p class="text-[10px] font-black text-slate-400">Target Stok Tidak Ditemukan</p></div>`;
+                return;
+            }
+
+            body.innerHTML = `
+                <div class="mb-6"><p class="text-[9px] font-black text-slate-400 uppercase mb-1">Item Dari Nota</p><h3 class="text-lg font-black text-blue-600 uppercase">${itemName} (x${qty})</h3></div>
+                <div class="space-y-3">
+                    ${possibleTargets.map(t => `
+                        <div onclick="showDetailModal('${t.nama_barang || t.Nama_Barang}', '${t.target}', '${t.realId}')" class="p-4 rounded-[28px] border-2 border-slate-100 bg-white hover:border-blue-500 cursor-pointer">
+                            <div class="flex justify-between items-center"><h4 class="font-black text-slate-800 text-sm uppercase">${t.nama_barang || t.Nama_Barang}</h4><span class="text-[9px] font-black bg-slate-100 px-2 py-1 rounded-lg">ID: ${t.realId}</span></div>
+                            <div class="flex gap-2 mt-2"><div class="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-[9px] font-bold">TGT: x${t.target}</div><div class="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg text-[9px] font-bold">SISA: x${t.sisa}</div></div>
+                        </div>
+                    `).join('')}
+                </div>`;
+        }
+
+        function openAutoVerifModal() {
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+            footer.classList.add('hidden');
+            document.getElementById('modal-title').innerText = "Verifikasi Otomatis";
+            document.getElementById('modal-container').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            body.innerHTML = `
+                <div class="p-4 bg-blue-50 border border-blue-100 rounded-3xl space-y-2">
+                    <p class="text-[10px] font-bold text-blue-700 uppercase tracking-tight">Info Fitur</p>
+                    <p class="text-[9px] text-blue-600 leading-relaxed">Sistem akan menandai SEMUA item pada nota dalam rentang tanggal yang dipilih sebagai "Terverifikasi" tanpa mencocokkan ke data Barang Masuk.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Dari Tanggal</label>
+                        <input type="date" id="av-start-date" value="${today}" class="w-full p-3 bg-slate-100 rounded-2xl text-xs font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Sampai Tanggal</label>
+                        <input type="date" id="av-end-date" value="${today}" class="w-full p-3 bg-slate-100 rounded-2xl text-xs font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                    </div>
+                </div>
+                <button onclick="executeAutoVerif()" id="btn-execute-av" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all">Mulai Verifikasi</button>
+            `;
+        }
+
+        async function executeAutoVerif() {
+            const start = document.getElementById('av-start-date').value;
+            const end = document.getElementById('av-end-date').value;
+            const btn = document.getElementById('btn-execute-av');
+            
+            if (!start || !end) return;
+
+            const startDate = new Date(start);
+            startDate.setHours(0,0,0,0);
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59,999);
+
+            // Filter nota yang belum diverifikasi di rentang tsb
+            const targetNotas = sheetPurchases.filter(p => {
+                const pDate = new Date(p.waktu);
+                if (pDate < startDate || pDate > endDate) return false;
+                
+                // Cek apakah ada item di nota ini yang belum diverifikasi
+                let rincian = [];
+                try { rincian = JSON.parse(p.itemRaw); } catch(e) {}
+                return rincian.some(item => !verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === item.nama));
+            });
+
+            if (targetNotas.length === 0) {
+                btn.innerText = "Tidak Ada Nota Baru";
+                btn.classList.replace('bg-blue-600', 'bg-slate-400');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loader mx-auto"></div>`;
+
+            let itemsToSave = [];
+            targetNotas.forEach(p => {
+                let rincian = [];
+                try { rincian = JSON.parse(p.itemRaw); } catch(e) {}
+                rincian.forEach(item => {
+                    // Hanya tambahkan jika belum terverifikasi
+                    if (!verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === item.nama)) {
+                        itemsToSave.push({
+                            parent_id: "AUTO-VERIF",
+                            transaction_id: "AUTO-VERIF",
+                            no_transaksi: p.no_transaksi,
+                            nama: item.nama,
+                            qty: Number(item.qty),
+                            harga: Number(item.harga || 0),
+                            waktu: p.waktu,
+                            is_auto: true
+                        });
+                    }
+                });
+            });
+
+            try {
+                await fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ 
+                        action: 'add_verified_items', 
+                        spreadsheet_id: SPREADSHEET_ID, 
+                        items: itemsToSave 
+                    }) 
+                });
+                
+                setTimeout(async () => {
+                    closeModal();
+                    await fetchData();
+                }, 800);
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerText = "Gagal, Coba Lagi";
+            }
         }
 
         function renderBarangMasuk() {
             const container = document.getElementById('list-container');
             const dataBarangMasuk = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK');
-            
             const processedData = dataBarangMasuk.map(t => {
+                const id = t.id || t.ID;
                 const target = Number(t.jumlah || 0);
-                const itemName = (t.nama_barang || "").toLowerCase();
-                const alreadyVerifiedCount = verifiedItems
-                    .filter(v => v.transaction_id == t.id && v.nama.toLowerCase().includes(itemName))
-                    .reduce((acc, curr) => acc + Number(curr.qty), 0);
-                const sisa = Math.max(0, target - alreadyVerifiedCount);
-                const isLunas = sisa === 0 || (t.barang_masuk || "").toString().toLowerCase() === 'selesai';
-                return { ...t, target, sisa, isLunas };
+                const count = verifiedItems.filter(v => v.parent_id == id || v.transaction_id == id).reduce((acc, curr) => acc + Number(curr.qty), 0);
+                const sisa = Math.max(0, target - count);
+                return { ...t, target, sisa, isLunas: sisa === 0, realId: id };
             });
 
             const filtered = processedData.filter(t => {
-                const matchSearch = (t.nama_barang || "").toLowerCase().includes(bmSearchQuery);
-                let matchStatus = true;
-                if (currentBMFilter === 'belum') matchStatus = !t.isLunas;
-                else if (currentBMFilter === 'selesai') matchStatus = t.isLunas;
-                return matchSearch && matchStatus;
+                const mSearch = (t.nama_barang || t.Nama_Barang || "").toLowerCase().includes(bmSearchQuery);
+                let mStatus = true;
+                if (currentBMFilter === 'belum') mStatus = !t.isLunas;
+                else if (currentBMFilter === 'selesai') mStatus = t.isLunas;
+                return mSearch && mStatus;
             });
 
-            container.innerHTML = `
-                <div class="bg-white rounded-[32px] border overflow-hidden divide-y divide-slate-50 shadow-sm">
-                    ${filtered.length === 0 ? `
-                        <div class="p-12 text-center">
-                            <div class="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <i data-lucide="package-search" class="w-6 h-6 text-slate-300"></i>
-                            </div>
-                            <p class="text-slate-400 font-bold uppercase text-[10px] tracking-widest">${bmSearchQuery ? 'Barang tidak ditemukan' : 'Tidak ada data ' + currentBMFilter}</p>
-                        </div>
-                    ` : filtered.map(t => `
-                        <div onclick="showDetailModal('${t.nama_barang}', '${t.jumlah || 0}', '${t.id}')" class="p-5 flex justify-between items-center hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer group">
-                            <div class="flex-1 overflow-hidden">
-                                <p class="text-[9px] text-slate-400 font-bold mb-1 uppercase tracking-tight">${t.waktu ? t.waktu.split('T')[0] : '-'}</p>
-                                <div class="flex items-center gap-2 mb-1.5">
-                                    <div class="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
-                                        <i data-lucide="box" class="w-3.5 h-3.5"></i>
-                                    </div>
-                                    <h4 class="font-black text-sm text-blue-800 uppercase tracking-tight truncate">${t.nama_barang || 'Barang Tanpa Nama'}</h4>
-                                </div>
-                                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[90%] mb-2">
-                                    <span class="text-slate-300 mr-1">Ket:</span> ${t.ket || t.keterangan || 'Tanpa Keterangan'}
-                                </p>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-black text-slate-400">TARGET x${t.target}</span>
-                                    ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-100 animate-pulse">SISA x${t.sisa}</span>` : ''}
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3 ml-2 shrink-0">
-                                <span class="px-2.5 py-1 rounded-xl text-[8px] font-black uppercase ${t.isLunas ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}">
-                                    ${t.isLunas ? 'Selesai' : 'Pending'}
-                                </span>
-                                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>`;
+            if (filtered.length === 0) { container.innerHTML = `<div class="p-12 text-center text-slate-400 font-bold uppercase text-[10px]">Kosong</div>`; return; }
+
+            container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `
+                <div onclick="showDetailModal('${t.nama_barang || t.Nama_Barang}', '${t.target}', '${t.realId}')" class="p-5 flex justify-between items-center cursor-pointer">
+                    <div><h4 class="font-black text-sm text-blue-800 uppercase">${t.nama_barang || t.Nama_Barang}</h4><div class="flex gap-2 mt-1"><span class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Target x${t.target}</span>${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 rounded-lg">SISA x${t.sisa}</span>` : '<span class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 rounded-lg">LUNAS</span>'}</div></div>
+                    <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
+                </div>`).join('')}</div>`;
             lucide.createIcons();
         }
 
         async function showDetailModal(itemName, itemQty, transactionId) {
             const body = document.getElementById('modal-body');
-            const title = document.getElementById('modal-title');
             const footer = document.getElementById('modal-footer');
             currentTransactionContext = { itemName, itemQty, transactionId };
             isShortageMode = false;
-            title.innerText = "Verifikasi Barang Masuk";
             footer.classList.add('hidden');
             selectedItemsForSync = [];
-            body.innerHTML = `<div class="flex flex-col items-center justify-center py-16"><div class="loader mb-3"></div><span class="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Mencocokkan nota...</span></div>`;
-            document.getElementById('modal-container').classList.remove('hidden');
-            setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
+            document.getElementById('modal-title').innerText = "Detail Verifikasi";
+            body.innerHTML = `<div class="flex flex-col items-center py-16"><div class="loader"></div></div>`;
+            
             await fetchVerifiedItems();
-            const searchQuery = itemName ? itemName.toLowerCase() : "";
+            
+            const searchQuery = itemName.toLowerCase().split(' ')[0];
             const filteredPurchases = sheetPurchases.filter(p => p.itemRaw.toLowerCase().includes(searchQuery));
-            const totalAlreadyVerified = verifiedItems
-                .filter(v => v.transaction_id == transactionId && v.nama.toLowerCase().includes(searchQuery))
-                .reduce((acc, curr) => acc + Number(curr.qty), 0);
-            baseRemainingQty = Math.max(0, itemQty - totalAlreadyVerified);
+            const count = verifiedItems.filter(v => v.parent_id == transactionId || v.transaction_id == transactionId).reduce((acc, curr) => acc + Number(curr.qty), 0);
+            baseRemainingQty = Math.max(0, itemQty - count);
+            
             body.innerHTML = `
-                <div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6 shadow-2xl relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                    <p class="text-[9px] font-black opacity-50 uppercase tracking-[0.2em] mb-2">Item Target Verifikasi</p>
-                    <div class="flex justify-between items-center">
-                        <h4 class="text-xl font-black uppercase tracking-tight flex-1 truncate mr-4">${itemName}</h4>
-                        <div class="bg-blue-600/30 backdrop-blur-md border border-blue-400/30 px-4 py-2 rounded-2xl text-center">
-                            <span class="block text-[8px] font-bold opacity-70 uppercase mb-0.5">Sisa Target</span>
-                            <div id="remaining-qty-display" class="text-sm font-black transition-all">x${baseRemainingQty}</div>
-                        </div>
-                    </div>
+                <div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6">
+                    <p class="text-[9px] font-black opacity-50 uppercase mb-1">Target Gudang (ID: ${transactionId})</p>
+                    <div class="flex justify-between items-center"><h4 class="text-lg font-black uppercase truncate mr-4">${itemName}</h4><div id="remaining-qty-display" class="bg-blue-600 px-4 py-2 rounded-2xl text-sm font-black">x${baseRemainingQty}</div></div>
                 </div>
-                <div id="purchases-list" class="space-y-4 pb-6"></div>`;
+                <div id="purchases-list" class="space-y-4"></div>`;
+
             const listContainer = document.getElementById('purchases-list');
             if (filteredPurchases.length === 0) {
-                listContainer.innerHTML = `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Riwayat belanja admin tidak ditemukan.</div>`;
+                listContainer.innerHTML = `<div class="py-10 text-center text-[10px] font-bold text-slate-400 bg-slate-50 rounded-3xl border-2 border-dashed">Nota tidak ditemukan</div>`;
             } else {
-                let hasItemsToShow = false;
-                const htmlContent = filteredPurchases.map((p, pIndex) => {
-                    let rincianItem = [];
-                    try { rincianItem = JSON.parse(p.itemRaw); } catch(e) { rincianItem = null; }
-                    const validItems = Array.isArray(rincianItem) ? rincianItem.filter(it => {
-                        const isTarget = it.nama.toLowerCase().includes(searchQuery);
-                        const isVerified = verifiedItems.some(v => v.no_transaksi == p.no_transaksi && v.nama == it.nama);
-                        return isTarget && !isVerified;
-                    }) : [];
-                    if (validItems.length === 0) return '';
-                    hasItemsToShow = true;
-                    return `
-                        <div class="p-5 bg-white border border-slate-100 rounded-[32px] shadow-sm space-y-4">
-                            <div class="flex justify-between items-center border-b border-slate-50 pb-3">
-                                <div><p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">${p.waktu}</p><p class="text-xs font-black text-slate-800">${p.no_transaksi}</p></div>
-                                <span class="bg-red-50 text-red-600 px-3 py-1 rounded-xl text-[10px] font-black">-${formatRupiah(p.keluar)}</span>
-                            </div>
-                            <div class="space-y-2">
-                                ${validItems.map((it, itIndex) => {
-                                    const uniqueId = `check-${pIndex}-${itIndex}`;
-                                    const itemData = JSON.stringify({ parent_id: transactionId, no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga, waktu: p.waktu }).replace(/"/g, '&quot;');
-                                    return `
-                                        <label for="${uniqueId}" class="flex justify-between items-center text-[11px] bg-slate-50/50 border-slate-100 p-3 rounded-2xl border active:scale-[0.98] cursor-pointer group transition-all hover:bg-blue-50/30">
-                                            <div class="flex items-center gap-4">
-                                                <div class="relative flex items-center justify-center">
-                                                    <input type="checkbox" id="${uniqueId}" class="item-checkbox sr-only" onchange="toggleItemCheck(this, '${itemData}')">
-                                                    <div class="checkbox-visual w-6 h-6 border-2 border-slate-200 rounded-xl bg-white flex items-center justify-center transition-all"><i data-lucide="check" class="w-4 h-4 text-white hidden"></i></div>
-                                                </div>
-                                                <span class="font-bold text-slate-700 uppercase leading-tight">${it.nama}</span>
-                                            </div>
-                                            <span class="font-black text-slate-500 bg-white px-2.5 py-1.5 rounded-xl border border-slate-100 shadow-sm">x${it.qty}</span>
-                                        </label>`;
-                                }).join('')}
-                            </div>
-                        </div>`;
+                listContainer.innerHTML = filteredPurchases.map((p) => {
+                    let items = JSON.parse(p.itemRaw).filter(it => it.nama.toLowerCase().includes(searchQuery));
+                    if (items.length === 0) return '';
+                    return `<div class="p-4 border rounded-[28px] space-y-3"><p class="text-[9px] font-bold text-slate-400 uppercase">${p.no_transaksi}</p>${items.map((it) => {
+                        const isUsed = verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
+                        return `<label class="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border ${isUsed ? 'opacity-40' : 'cursor-pointer'}">
+                            <div class="flex items-center gap-3"><input type="checkbox" ${isUsed ? 'disabled' : ''} onchange="toggleItemCheck(this, '${JSON.stringify({parent_id: transactionId, no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;')}')" class="item-checkbox sr-only"><div class="checkbox-visual w-5 h-5 border-2 rounded-lg flex items-center justify-center"><i data-lucide="check" class="w-3 h-3 text-white hidden"></i></div><span class="text-[11px] font-bold uppercase">${it.nama}</span></div><span class="text-[11px] font-black">x${it.qty}</span>
+                        </label>`;
+                    }).join('')}</div>`;
                 }).join('');
-                listContainer.innerHTML = hasItemsToShow ? htmlContent : `<div class="py-16 text-center text-slate-400 font-bold uppercase text-[10px] bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">Semua nota sudah diproses.</div>`;
             }
             if (baseRemainingQty > 0) footer.classList.remove('hidden');
             lucide.createIcons();
         }
 
-        function toggleShortageMode() {
-            const btn = document.getElementById('btn-shortage-mode');
-            const display = document.getElementById('remaining-qty-display');
-            const bonusAlert = document.getElementById('bonus-alert');
-            const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
-            isShortageMode = !isShortageMode;
-            if (isShortageMode) {
-                btn.innerText = "Batalkan";
-                btn.classList.replace('bg-indigo-600', 'bg-slate-500');
-                display.className = "text-sm font-black transition-all text-indigo-400";
-                display.innerHTML = `LUNAS (P)`;
-                bonusAlert.classList.add('hidden');
-            } else {
-                btn.innerText = "Lunasi Sisa";
-                btn.classList.replace('bg-slate-500', 'bg-indigo-600');
-                const newRemaining = Math.max(0, baseRemainingQty - totalSelectedQty);
-                display.innerText = newRemaining === 0 ? 'LUNAS' : `x${newRemaining}`;
-                display.className = `text-sm font-black transition-all ${newRemaining === 0 ? 'text-emerald-400' : 'text-white'}`;
-                const excess = Math.max(0, totalSelectedQty - baseRemainingQty);
-                if (excess > 0) bonusAlert.classList.remove('hidden');
-            }
-        }
-
         function toggleItemCheck(el, dataStr) {
             const data = JSON.parse(dataStr);
-            const label = el.closest('label');
-            const display = document.getElementById('remaining-qty-display');
-            const bonusAlert = document.getElementById('bonus-alert');
-            const bonusText = document.getElementById('bonus-text');
-            if (el.checked) {
-                label.classList.add('bg-blue-50', 'border-blue-400', 'ring-2', 'ring-blue-100');
-                label.classList.remove('bg-slate-50/50', 'border-slate-100');
-                selectedItemsForSync.push(data);
-            } else {
-                label.classList.remove('bg-blue-50', 'border-blue-400', 'ring-2', 'ring-blue-100');
-                label.classList.add('bg-slate-50/50', 'border-slate-100');
-                selectedItemsForSync = selectedItemsForSync.filter(i => !(i.no_transaksi === data.no_transaksi && i.nama === data.nama));
-            }
-            const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
-            const newRemaining = Math.max(0, baseRemainingQty - totalSelectedQty);
-            const excess = Math.max(0, totalSelectedQty - baseRemainingQty);
-            if (!isShortageMode) {
-                display.innerText = newRemaining === 0 ? 'LUNAS' : `x${newRemaining}`;
-                display.className = `text-sm font-black transition-all ${newRemaining === 0 ? 'text-emerald-400' : 'text-white'}`;
-                if (excess > 0) {
-                    bonusAlert.classList.remove('hidden');
-                    bonusText.innerText = `Terpilih x${totalSelectedQty}. Kurang x${excess} dicatat masuk diawal.`;
-                } else {
-                    bonusAlert.classList.add('hidden');
-                }
-            }
+            if (el.checked) selectedItemsForSync.push(data);
+            else selectedItemsForSync = selectedItemsForSync.filter(i => !(i.no_transaksi === data.no_transaksi && i.nama === data.nama));
+            const total = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
+            const sisa = Math.max(0, baseRemainingQty - total);
+            document.getElementById('remaining-qty-display').innerText = sisa === 0 ? 'LUNAS' : `x${sisa}`;
+            document.getElementById('remaining-qty-display').className = `px-4 py-2 rounded-2xl text-sm font-black ${sisa === 0 ? 'bg-emerald-500' : 'bg-blue-600'}`;
+        }
+
+        function toggleShortageMode() {
+            isShortageMode = !isShortageMode;
+            const btn = document.getElementById('btn-shortage-mode');
+            btn.innerText = isShortageMode ? "Batalkan" : "Lunasi Sisa";
+            btn.className = isShortageMode ? "px-4 py-2 bg-slate-500 text-white text-[10px] font-black rounded-xl" : "px-4 py-2 bg-indigo-600 text-white text-[10px] font-black rounded-xl";
         }
 
         async function saveVerifiedItems() {
+            if (!currentTransactionContext) return;
             const btn = document.getElementById('btn-save-verification');
-            const totalSelectedQty = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
             if (selectedItemsForSync.length === 0 && !isShortageMode) return;
+            
             btn.disabled = true;
-            btn.innerHTML = `<div class="loader"></div> <span class="ml-3">Memproses...</span>`;
-            let cumulativeQty = 0;
-            const itemsToSave = selectedItemsForSync.map(item => {
-                const itemQty = Number(item.qty);
-                const startAt = cumulativeQty;
-                cumulativeQty += itemQty;
-                let regularPart = 0, bonusPart = 0;
-                if (startAt >= baseRemainingQty) bonusPart = itemQty;
-                else if (cumulativeQty > baseRemainingQty) { regularPart = baseRemainingQty - startAt; bonusPart = itemQty - regularPart; }
-                else regularPart = itemQty;
-                return { ...item, regular_qty: regularPart, bonus_qty: bonusPart, is_bonus: bonusPart > 0 };
-            });
-            if (isShortageMode && totalSelectedQty < baseRemainingQty) {
-                const shortageDiff = baseRemainingQty - totalSelectedQty;
-                itemsToSave.push({ parent_id: currentTransactionContext.transactionId, no_transaksi: "VERIF-LUNAS", nama: currentTransactionContext.itemName, qty: shortageDiff, regular_qty: shortageDiff, bonus_qty: 0, is_bonus: false, is_adjustment: true, waktu: new Date().toISOString() });
+            btn.innerHTML = `<div class="loader"></div>`;
+            
+            const itemsToSave = selectedItemsForSync.map(item => ({
+                parent_id: String(item.parent_id), 
+                transaction_id: String(item.parent_id),
+                no_transaksi: item.no_transaksi,
+                nama: item.nama,
+                qty: Number(item.qty),
+                harga: Number(item.harga || 0),
+                waktu: item.waktu || new Date().toISOString(),
+                is_bonus: false
+            }));
+
+            if (isShortageMode) {
+                const totalSelected = selectedItemsForSync.reduce((acc, curr) => acc + Number(curr.qty), 0);
+                const diff = baseRemainingQty - totalSelected;
+                if (diff > 0) {
+                    itemsToSave.push({
+                        parent_id: String(currentTransactionContext.transactionId),
+                        transaction_id: String(currentTransactionContext.transactionId),
+                        no_transaksi: "MANUAL-ADJUST",
+                        nama: currentTransactionContext.itemName + " (Manual)",
+                        qty: diff,
+                        harga: 0,
+                        waktu: new Date().toISOString(),
+                        is_adjustment: true
+                    });
+                }
             }
+
             try {
-                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemsToSave }) });
-                btn.classList.replace('bg-blue-600', 'bg-emerald-600');
-                btn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> Berhasil`;
-                setTimeout(() => { closeModal(); fetchData(); }, 1200);
-            } catch (e) { btn.disabled = false; btn.innerHTML = "Gagal Simpan"; }
+                await fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ 
+                        action: 'add_verified_items', 
+                        spreadsheet_id: SPREADSHEET_ID, 
+                        items: itemsToSave 
+                    }) 
+                });
+                
+                setTimeout(async () => {
+                    closeModal();
+                    await fetchData();
+                }, 800);
+            } catch (e) { 
+                console.error(e);
+                btn.disabled = false; 
+                btn.innerHTML = "Simpan Ulang"; 
+            }
         }
 
         function closeModal() {
             document.getElementById('modal-backdrop').style.opacity = '0';
             document.getElementById('modal-content').style.transform = 'translateY(100%)';
             setTimeout(() => document.getElementById('modal-container').classList.add('hidden'), 300);
-        }
-
-        function renderCard(t) {
-            const isMasuk = Number(t.masuk || 0) > 0;
-            return `<div class="p-4 bg-slate-50/50 rounded-2xl flex justify-between items-center border border-slate-100">
-                <div class="flex-1 pr-4">
-                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">${t.waktu ? t.waktu.split('T')[0] : ''}</p>
-                    <p class="font-bold text-slate-800 text-sm uppercase truncate">${t.ket || t.keterangan || 'Kas'}</p>
-                </div>
-                <div class="text-right shrink-0">
-                    <p class="font-black text-sm ${isMasuk ? 'text-emerald-600' : 'text-rose-600'}">${isMasuk ? '+' : '-'}${formatRupiah(isMasuk ? t.masuk : t.keluar)}</p>
-                    <p class="text-[8px] text-slate-300 font-bold uppercase mt-0.5 tracking-widest">#${t.id}</p>
-                </div>
-            </div>`;
         }
 
         function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(n)); }
