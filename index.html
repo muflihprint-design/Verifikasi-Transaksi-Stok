@@ -125,7 +125,7 @@
         const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
         const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRvAQXltAVp8lnrXXVVPJr1hYEi8cAJrqz182qT23eaiI8t-MoBrEtE7bAAJqKEyKKTig4hpA9DNuQB/pub?gid=2057149863&single=true&output=csv";
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZNmMPh3BM6IU9529KSCzxhEMhZlfvwCmjcl8B2aiyFO_JGsNrf2NJGsWEXtDm6wlWaQ/exec"; 
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxFFQOeMvmy8gwhIH1dO4t4m6pLagS-F1Lkb7tlMVV5snDrMJvK_LJWNYF4n2DMLI7Ksg/exec"; 
         const SPREADSHEET_ID = "15qzJ3txkTBYNFc09RWUAr5ZKUa_lQcOHKCThwJ3r0Fk";
 
         let allTransactions = [];
@@ -493,7 +493,27 @@
                 <p class="text-[9px] font-black opacity-40 uppercase mb-1">Stok Masuk: ${formattedDate}</p>
                 <div class="flex justify-center items-center gap-4"><h4 class="text-lg font-black uppercase truncate">${name}</h4><div class="bg-blue-600 px-4 py-2 rounded-2xl text-xs font-black">x${baseRemainingQty}</div></div>
             </div>
-            ${currentVerified.length > 0 ? `<div class="mb-6 space-y-2">${currentVerified.map(v => `<div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl"><div><div class="flex items-center gap-2"><p class="text-[8px] font-black text-emerald-400 uppercase">${v.no_transaksi}</p><p class="text-[8px] font-black text-slate-400 uppercase">${v.waktu}</p></div><p class="text-[10px] font-bold text-emerald-700 uppercase">${v.nama}</p></div><span class="text-[10px] font-black text-emerald-600">x${v.qty}</span></div>`).join('')}</div>` : ''}
+           ${currentVerified.length > 0 ? `
+    <div class="mb-6 space-y-2">
+        <p class="text-[9px] font-black text-emerald-500 uppercase mb-2 ml-2">Riwayat Verifikasi</p>
+        ${currentVerified.map(v => {
+            // Memformat tanggal verifikasi dari Apps Script
+            const dV = v.tgl_verif ? new Date(v.tgl_verif) : null;
+            const tglTampil = dV ? dV.toLocaleDateString('id-ID', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '-';
+            
+            return `
+            <div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <p class="text-[8px] font-black text-emerald-400 uppercase">${v.no_transaksi}</p>
+                        <p class="text-[8px] font-black text-slate-400 uppercase">Verif: ${tglTampil}</p>
+                    </div>
+                    <p class="text-[10px] font-bold text-emerald-700 uppercase">${v.nama}</p>
+                </div>
+                <span class="text-[10px] font-black text-emerald-600">x${v.qty}</span>
+            </div>`;
+        }).join('')}
+    </div>` : ''}
             
             <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Pilih Item Nota (Asal)</p>
             <div id="nota-list" class="space-y-4"></div>`;
