@@ -6,7 +6,6 @@
   <title>Kasir & Arus Kas Modern</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Library JSPDF & AutoTable untuk export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   
@@ -43,11 +42,16 @@
     <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4">
         <div class="flex justify-between items-center">
             <div>
-                <h1 id="page-title" class="text-xl font-black text-slate-800 tracking-tight text-blue-600 uppercase">BERANDA</h1>
+                <h1 id="page-title" class="text-xl font-black text-slate-800 tracking-tight text-blue-600 uppercase">NOTA BELANJA</h1>
                 <p id="current-date" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Memuat...</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center">
                 <div id="sync-indicator" class="hidden"><div class="loader"></div></div>
+                <div id="export-container">
+                    <button onclick="exportToPDF()" class="p-2.5 bg-blue-50 rounded-2xl text-blue-600 hover:bg-blue-100 transition-colors">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                    </button>
+                </div>
                 <button onclick="fetchData()" class="p-2.5 bg-slate-100 rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">
                     <i data-lucide="refresh-cw" class="w-5 h-5"></i>
                 </button>
@@ -56,48 +60,8 @@
     </header>
 
     <main id="app-content" class="p-4 space-y-6 page-transition">
-        <!-- Dashboard -->
-        <div id="dashboard-container" class="space-y-4">
-            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden text-center">
-                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">Total Saldo Tunai</p>
-                <h2 id="total-saldo" class="text-3xl font-black tracking-tight mb-4">Rp 0</h2>
-                <div class="flex gap-3">
-                    <div class="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-3">
-                        <p class="text-[8px] font-bold opacity-70 uppercase mb-0.5">Pemasukan</p>
-                        <p id="total-masuk" class="text-xs font-black">Rp 0</p>
-                    </div>
-                    <div class="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-3">
-                        <p class="text-[8px] font-bold opacity-70 uppercase mb-0.5">Pengeluaran</p>
-                        <p id="total-keluar" class="text-xs font-black">Rp 0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4 mt-6">
-                <button onclick="changeTab('barang_masuk')" class="flex flex-col items-center gap-2 p-5 bg-orange-50 rounded-[28px] border border-orange-100 active:scale-95 transition-all">
-                    <div class="p-3 bg-orange-500 rounded-2xl text-white shadow-lg shadow-orange-200">
-                        <i data-lucide="package-check" class="w-6 h-6"></i>
-                    </div>
-                    <span class="text-[10px] font-black text-orange-700 uppercase tracking-wider">Cek Stok Masuk</span>
-                </button>
-                <button onclick="changeTab('nota_belanja')" class="flex flex-col items-center gap-2 p-5 bg-indigo-50 rounded-[28px] border border-indigo-100 active:scale-95 transition-all">
-                    <div class="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
-                        <i data-lucide="receipt" class="w-6 h-6"></i>
-                    </div>
-                    <span class="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Nota Belanja</span>
-                </button>
-            </div>
-        </div>
-
         <!-- Filter & Search -->
-        <div id="search-wrapper" class="hidden space-y-4">
-            <div id="export-container" class="hidden flex justify-end">
-                <button onclick="exportToPDF()" class="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 hover:bg-rose-100 transition-all active:scale-95">
-                    <i data-lucide="file-text" class="w-4 h-4"></i>
-                    <span class="text-[10px] font-black uppercase">Export PDF (Pending)</span>
-                </button>
-            </div>
-
+        <div id="search-wrapper" class="space-y-4">
             <div class="relative">
                 <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="search" class="w-4 h-4"></i>
@@ -106,7 +70,7 @@
                     type="text" 
                     id="bm-search-input"
                     oninput="handleBMSearch(this.value)"
-                    placeholder="Cari No. Transaksi atau Nama Barang..." 
+                    placeholder="Cari transaksi atau barang..." 
                     class="w-full bg-slate-100 border-none rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-slate-800 outline-none"
                 >
             </div>
@@ -118,7 +82,7 @@
             </div>
         </div>
 
-        <div id="list-container" class="hidden space-y-4"></div>
+        <div id="list-container" class="space-y-4"></div>
     </main>
 
     <!-- Modals -->
@@ -135,7 +99,7 @@
             <div id="modal-footer" class="p-4 bg-slate-50 border-t border-slate-100 hidden">
                  <button onclick="manualCompletion()" id="btn-manual-comp" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
                     <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    Masukkan Sisa Sebagai Bonus
+                    Selesaikan Manual (Bonus)
                  </button>
             </div>
         </div>
@@ -143,12 +107,8 @@
 
     <!-- Navigation -->
     <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-lg border-t border-slate-100 px-6 py-4 z-40">
-        <div class="flex justify-between items-center max-w-xs mx-auto">
-            <button onclick="changeTab('beranda')" id="nav-beranda" class="flex flex-col items-center gap-1 text-slate-400 nav-active">
-                <i data-lucide="layout-grid" class="w-6 h-6"></i>
-                <span class="text-[9px] font-bold uppercase tracking-wider">Mulai</span>
-            </button>
-            <button onclick="changeTab('nota_belanja')" id="nav-nota_belanja" class="flex flex-col items-center gap-1 text-slate-400">
+        <div class="flex justify-around items-center max-w-xs mx-auto">
+            <button onclick="changeTab('nota_belanja')" id="nav-nota_belanja" class="flex flex-col items-center gap-1 text-slate-400 nav-active">
                 <i data-lucide="receipt" class="w-6 h-6"></i>
                 <span class="text-[9px] font-bold uppercase tracking-wider">Nota</span>
             </button>
@@ -171,7 +131,7 @@
         let allTransactions = [];
         let sheetPurchases = [];
         let verifiedItems = [];
-        let currentTab = 'beranda';
+        let currentTab = 'nota_belanja';
         let currentBMFilter = 'belum';
         let bmSearchQuery = "";
         let baseRemainingQty = 0;
@@ -199,13 +159,9 @@
                 sheetPurchases = parseCSV(csvText);
                 
                 await fetchVerifiedItems();
-                updateDashboard();
                 refreshView();
-            } catch (err) { 
-                console.error("Fetch Error:", err); 
-            } finally { 
-                if(indicator) indicator.classList.add('hidden'); 
-            }
+            } catch (err) { console.error(err); } 
+            finally { if(indicator) indicator.classList.add('hidden'); }
         }
 
         async function fetchVerifiedItems() {
@@ -227,141 +183,23 @@
                 let inQuotes = false, val = '';
                 for (let j = 0; j < line.length; j++) {
                     const char = line[j];
-                    if (char === '"') { 
-                        if (inQuotes && line[j+1] === '"') { val += '"'; j++; } 
-                        else inQuotes = !inQuotes; 
-                    }
+                    if (char === '"') { if (inQuotes && line[j+1] === '"') { val += '"'; j++; } else inQuotes = !inQuotes; }
                     else if (char === ',' && !inQuotes) { row.push(val.trim()); val = ''; }
                     else val += char;
                 }
                 row.push(val.trim());
                 if (row[3] && row[3].toLowerCase() === 'pembelian') {
-                    result.push({ 
-                        no_transaksi: row[0], 
-                        waktu: row[1], 
-                        keterangan: row[4], 
-                        keluar: row[6], 
-                        pelanggan: row[8] || "Umum", 
-                        itemRaw: row[10] || "[]" 
-                    });
+                    result.push({ no_transaksi: row[0], waktu: row[1], keterangan: row[4], keluar: row[6], pelanggan: row[8] || "Umum", itemRaw: row[10] || "[]" });
                 }
             }
             return result;
-        }
-
-        function refreshView() {
-            ['beranda', 'nota_belanja', 'barang_masuk'].forEach(t => {
-                const nav = document.getElementById('nav-' + t);
-                if (nav) nav.classList.toggle('nav-active', currentTab === t);
-            });
-            
-            const exportBtn = document.getElementById('export-container');
-            if (exportBtn) exportBtn.classList.toggle('hidden', currentTab !== 'nota_belanja');
-
-            if (currentTab === 'nota_belanja') renderNotaBelanja();
-            else if (currentTab === 'barang_masuk') renderBarangMasuk();
-            lucide.createIcons();
-        }
-
-        function updateDashboard() {
-            let masuk = 0, keluar = 0;
-            allTransactions.forEach(t => { masuk += Number(t.masuk || 0); keluar += Number(t.keluar || 0); });
-            const sMasuk = document.getElementById('total-masuk');
-            const sKeluar = document.getElementById('total-keluar');
-            const sSaldo = document.getElementById('total-saldo');
-            if(sMasuk) sMasuk.innerText = formatRupiah(masuk);
-            if(sKeluar) sKeluar.innerText = formatRupiah(keluar);
-            if(sSaldo) sSaldo.innerText = formatRupiah(masuk - keluar);
-        }
-
-        function changeTab(tab) {
-            currentTab = tab;
-            document.getElementById('page-title').innerText = tab.replace('_', ' ').toUpperCase();
-            document.getElementById('dashboard-container').classList.toggle('hidden', tab !== 'beranda');
-            document.getElementById('search-wrapper').classList.toggle('hidden', tab === 'beranda');
-            document.getElementById('list-container').classList.toggle('hidden', tab === 'beranda');
-            refreshView();
-        }
-
-        function handleBMSearch(val) { bmSearchQuery = val.toLowerCase(); refreshView(); }
-        
-        function setBMFilter(v) {
-            currentBMFilter = v;
-            ['belum', 'selesai', 'semua'].forEach(f => {
-                const btn = document.getElementById(`btn-f-${f}`);
-                if (f === v) btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
-                else btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
-            });
-            refreshView();
-        }
-
-        function showAlert(msg) {
-            const el = document.getElementById('custom-alert');
-            el.innerText = msg;
-            el.classList.remove('hidden');
-            setTimeout(() => el.classList.add('hidden'), 3000);
-        }
-
-        function renderNotaBelanja() {
-            const container = document.getElementById('list-container');
-            const filtered = sheetPurchases.filter(p => {
-                let items = [];
-                try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
-                const matchInItems = items.some(it => it.nama.toLowerCase().includes(bmSearchQuery));
-                const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery) || p.pelanggan.toLowerCase().includes(bmSearchQuery);
-                const isMatch = matchInHeader || matchInItems;
-                const allDone = items.length > 0 && items.every(it => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
-                if (currentBMFilter === 'belum') return isMatch && !allDone;
-                if (currentBMFilter === 'selesai') return isMatch && allDone;
-                return isMatch;
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="py-20 text-center space-y-4"><div class="inline-flex p-4 bg-slate-50 rounded-full text-slate-300"><i data-lucide="search-x" class="w-10 h-10"></i></div><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p></div>`;
-                lucide.createIcons();
-                return;
-            }
-
-            container.innerHTML = filtered.map(p => {
-                let items = [];
-                try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
-                return `
-                <div class="bg-white rounded-[32px] border p-5 shadow-sm space-y-4">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${p.waktu}</p>
-                            <h4 class="font-black text-slate-800 text-sm">${p.no_transaksi}</h4>
-                            <p class="text-[10px] font-bold text-blue-600 uppercase mt-0.5">${p.pelanggan}</p>
-                        </div>
-                        <span class="bg-red-50 text-red-600 px-3 py-1 rounded-xl text-[10px] font-black">-${formatRupiah(p.keluar)}</span>
-                    </div>
-                    <div class="space-y-2">
-                        ${items.map(it => {
-                            const vRecord = verifiedItems.find(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
-                            const isV = !!vRecord;
-                            const isIgnored = isV && vRecord.parent_id === "IGNORED";
-                            let statusUI = '';
-                            if (isIgnored) statusUI = `<span class="bg-slate-100 text-slate-400 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">DIABAIKAN</span>`;
-                            else if (isV) {
-                                const parentBM = allTransactions.find(t => (t.id || t.ID) == vRecord.parent_id);
-                                if (parentBM) {
-                                    const vCount = verifiedItems.filter(v => v.parent_id == (parentBM.id || parentBM.ID)).reduce((acc, curr) => acc + Number(curr.qty), 0);
-                                    const sisa = Math.max(0, Number(parentBM.jumlah || 0) - vCount);
-                                    statusUI = `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Sisa Gudang: x${sisa}</span>`;
-                                }
-                            }
-                            const itemDataStr = JSON.stringify({no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;');
-                            return `<div onclick="openStockPicker('${itemDataStr}', ${isV})" class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isIgnored ? 'opacity-60' : ''}"><div class="flex justify-between items-center"><span class="text-[10px] font-bold text-slate-700 uppercase truncate pr-4">${it.nama}</span><div class="flex items-center gap-2"><span class="text-[10px] font-black text-slate-500">x${it.qty}</span>${isV ? `<i data-lucide="${isIgnored ? 'eye-off' : 'check-circle'}" class="w-4 h-4 ${isIgnored ? 'text-slate-300' : 'text-emerald-500'}"></i>` : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}</div></div>${statusUI ? `<div class="mt-1 flex items-center gap-2">${statusUI}</div>` : ''}</div>`;
-                        }).join('')}
-                    </div>
-                </div>`}).join('');
         }
 
         async function exportToPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
             const now = new Date().toLocaleString('id-ID');
-            const pageMaxWidth = 182; // Area cetak standar A4 (210mm - margin)
+            const pageMaxWidth = 182; 
 
             doc.setFontSize(14);
             doc.setTextColor(37, 99, 235);
@@ -390,13 +228,11 @@
                 let items = [];
                 try { items = JSON.parse(p.itemRaw); } catch(e) {}
 
-                // Validasi sisa ruang di halaman
                 if (startY > 240) {
                     doc.addPage();
                     startY = 20;
                 }
 
-                // Header Transaksi
                 doc.setDrawColor(226, 232, 240);
                 doc.setFillColor(248, 250, 252);
                 doc.roundedRect(14, startY - 5, pageMaxWidth, 16, 2, 2, 'FD');
@@ -433,13 +269,12 @@
                     theme: 'grid',
                     styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
                     headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' },
-                    // Fix Lebar Kolom: Total Lebar Harus <= pageMaxWidth (182)
                     columnStyles: {
-                        0: { cellWidth: 70 }, // Nama Barang
-                        1: { cellWidth: 15, halign: 'center' }, // Qty
-                        2: { cellWidth: 32, halign: 'right' }, // Harga Satuan
-                        3: { cellWidth: 35, halign: 'right' }, // Total
-                        4: { cellWidth: 30, halign: 'center' }  // Status
+                        0: { cellWidth: 70 },
+                        1: { cellWidth: 15, halign: 'center' },
+                        2: { cellWidth: 32, halign: 'right' },
+                        3: { cellWidth: 35, halign: 'right' },
+                        4: { cellWidth: 30, halign: 'center' } 
                     },
                     didParseCell: function(data) {
                         if (data.column.index === 4) {
@@ -463,80 +298,140 @@
             showAlert("PDF Berhasil di-export");
         }
 
-        function getSimilarityScore(itemName, stockName) {
-            itemName = itemName.toLowerCase();
-            stockName = stockName.toLowerCase();
-            if (itemName === stockName) return 100;
-            if (stockName.includes(itemName) || itemName.includes(stockName)) return 80;
-            const itemWords = itemName.split(/\s+/).filter(w => w.length > 2);
-            let matches = 0;
-            itemWords.forEach(iw => { if (stockName.includes(iw)) matches++; });
-            if (matches > 0) return 50 + (matches * 10);
-            return 0;
+        function refreshView() {
+            ['nota_belanja', 'barang_masuk'].forEach(t => {
+                const nav = document.getElementById('nav-' + t);
+                if (nav) nav.classList.toggle('nav-active', currentTab === t);
+            });
+            
+            const exportContainer = document.getElementById('export-container');
+            if (exportContainer) exportContainer.style.display = (currentTab === 'nota_belanja') ? 'block' : 'none';
+            
+            if (currentTab === 'nota_belanja') renderNotaBelanja();
+            else if (currentTab === 'barang_masuk') renderBarangMasuk();
+            lucide.createIcons();
+        }
+
+        function changeTab(tab) {
+            currentTab = tab;
+            document.getElementById('page-title').innerText = tab.replace('_', ' ').toUpperCase();
+            refreshView();
+        }
+
+        function handleBMSearch(val) { bmSearchQuery = val.toLowerCase(); refreshView(); }
+        
+        function setBMFilter(v) {
+            currentBMFilter = v;
+            ['belum', 'selesai', 'semua'].forEach(f => {
+                const btn = document.getElementById(`btn-f-${f}`);
+                if (f === v) btn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                else btn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+            });
+            refreshView();
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('custom-alert');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        function renderNotaBelanja() {
+            const container = document.getElementById('list-container');
+            const filtered = sheetPurchases.filter(p => {
+                let items = []; try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
+                const matchInItems = items.some(it => it.nama.toLowerCase().includes(bmSearchQuery));
+                const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery) || p.pelanggan.toLowerCase().includes(bmSearchQuery);
+                const isMatch = matchInHeader || matchInItems;
+                const allDone = items.length > 0 && items.every(it => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
+                if (currentBMFilter === 'belum') return isMatch && !allDone;
+                if (currentBMFilter === 'selesai') return isMatch && allDone;
+                return isMatch;
+            });
+            if (filtered.length === 0) { container.innerHTML = `<p class="py-20 text-center text-[10px] font-black text-slate-400">Tidak ada data</p>`; return; }
+            container.innerHTML = filtered.map(p => {
+                let items = []; try { items = JSON.parse(p.itemRaw); } catch(e) {}
+                return `
+                <div class="bg-white rounded-[32px] border p-5 shadow-sm space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${p.waktu}</p>
+                            <h4 class="font-black text-slate-800 text-sm">${p.no_transaksi}</h4>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase mt-0.5">${p.pelanggan}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        ${items.map(it => {
+                            const vRecord = verifiedItems.find(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
+                            const isV = !!vRecord;
+                            const isIgnored = isV && vRecord.parent_id === "IGNORED";
+                            const itemDataStr = JSON.stringify({no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;');
+                            return `<div onclick="openStockPicker('${itemDataStr}', ${isV})" class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isIgnored ? 'opacity-60' : ''}"><div class="flex justify-between items-center"><span class="text-[10px] font-bold text-slate-700 uppercase truncate pr-4">${it.nama}</span><div class="flex items-center gap-2"><span class="text-[10px] font-black text-slate-500">x${it.qty}</span>${isV ? `<i data-lucide="${isIgnored ? 'eye-off' : 'check-circle'}" class="w-4 h-4 ${isIgnored ? 'text-slate-300' : 'text-emerald-500'}"></i>` : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}</div></div></div>`;
+                        }).join('')}
+                    </div>
+                </div>`}).join('');
         }
 
         async function openStockPicker(itemDataStr, isVerified) {
             if (isVerified) return;
             const itemData = JSON.parse(itemDataStr);
             const body = document.getElementById('modal-body');
-            document.getElementById('modal-title').innerText = "Opsi Validasi Item";
+            document.getElementById('modal-title').innerText = "Validasi Item";
             document.getElementById('modal-footer').classList.add('hidden');
             document.getElementById('modal-container').classList.remove('hidden');
-            setTimeout(() => { 
-                document.getElementById('modal-backdrop').style.opacity = '1'; 
-                document.getElementById('modal-content').style.transform = 'translateY(0)'; 
-            }, 10);
+            setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
             body.innerHTML = `<div class="flex justify-center py-12"><div class="loader"></div></div>`;
             const listGudang = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK')
                 .map(t => {
                     const id = t.id || t.ID;
                     const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id).reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
                     const sisa = Math.max(0, Number(t.jumlah || 0) - vCount);
-                    const similarity = getSimilarityScore(itemData.nama, (t.nama_barang || t.Nama_Barang || ""));
-                    return { ...t, sisa, realId: id, similarity, nama_barang: t.nama_barang || t.Nama_Barang };
+                    const createdAt = t.created_at ? new Date(t.created_at).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'}) : 'No Date';
+                    return { ...t, sisa, realId: id, similarity: getSimilarityScore(itemData.nama, (t.nama_barang || t.Nama_Barang || "")), nama_barang: t.nama_barang || t.Nama_Barang, dateStr: createdAt };
                 }).filter(t => t.sisa > 0);
             const recommended = listGudang.filter(g => g.similarity > 0).sort((a, b) => b.similarity - a.similarity);
             const others = listGudang.filter(g => g.similarity === 0).sort((a, b) => a.nama_barang.localeCompare(b.nama_barang));
-            const renderItem = (g, isRec) => {
-                const itemDataEscaped = JSON.stringify(itemData).replace(/"/g, '&quot;');
-                return `<div onclick="processVerificationFromNota('${g.realId}', '${itemDataEscaped}', this)" class="p-4 border-2 ${isRec ? 'border-blue-100 bg-blue-50/20' : 'border-slate-50'} rounded-[24px] flex justify-between items-center cursor-pointer active:scale-95 transition-all"><div class="flex flex-col gap-1 overflow-hidden pr-2"><span class="text-[11px] font-black text-slate-800 uppercase truncate">${g.nama_barang}</span><span class="text-[9px] font-bold text-slate-400 uppercase">Gudang: x${g.sisa}</span></div><div class="shrink-0 flex items-center">${isRec ? `<span class="mr-2 text-[8px] font-black text-blue-400">${g.similarity}%</span>` : ''}<i data-lucide="${isRec ? 'star' : 'plus-circle'}" class="w-5 h-5 ${isRec ? 'text-blue-500 fill-blue-500' : 'text-slate-300'}"></i></div></div>`;
-            };
-            const itemDataEscapedForIgnore = JSON.stringify(itemData).replace(/"/g, '&quot;');
-            body.innerHTML = `<div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl mb-6"><p class="text-[8px] font-black text-indigo-400 uppercase mb-1">Item Nota Terpilih</p><div class="flex justify-between items-center"><span class="text-xs font-black text-indigo-700 uppercase">${itemData.nama}</span><span class="bg-indigo-600 text-white px-3 py-1 rounded-xl text-[10px] font-black">x${itemData.qty}</span></div></div><div class="mb-8"><button onclick="ignoreNotaItem('${itemDataEscapedForIgnore}', this)" class="w-full p-4 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center gap-3 text-slate-400 group"><i data-lucide="eye-off" class="w-5 h-5 group-hover:scale-110"></i><span class="text-[10px] font-black uppercase">Abaikan Item Ini</span></button></div>${recommended.length > 0 ? `<p class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Sangat Cocok</p><div class="space-y-3 mb-6">${recommended.map(g => renderItem(g, true)).join('')}</div>` : ''}<p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Hubungkan ke Stok Gudang</p><div class="space-y-3">${others.map(g => renderItem(g, false)).join('')}${listGudang.length === 0 ? '<p class="text-center text-[10px] py-10 text-slate-300">Gudang Kosong</p>' : ''}</div>`;
+            
+            body.innerHTML = `
+            <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl mb-6">
+                <div class="flex justify-between items-start mb-1">
+                    <p class="text-[8px] font-black text-indigo-400 uppercase">Item Nota Terpilih</p>
+                    <p class="text-[8px] font-black text-indigo-300 uppercase">${itemData.waktu}</p>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-black text-indigo-700 uppercase">${itemData.nama}</span>
+                    <span class="bg-indigo-600 text-white px-3 py-1 rounded-xl text-[10px] font-black">x${itemData.qty}</span>
+                </div>
+            </div>
+            <button onclick="ignoreNotaItem('${JSON.stringify(itemData).replace(/"/g, '&quot;')}', this)" class="w-full p-4 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center gap-3 text-slate-400 mb-6"><i data-lucide="eye-off" class="w-5 h-5"></i><span class="text-[10px] font-black uppercase">Abaikan Item Ini</span></button>
+            
+            <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Pilih Stok Masuk (Tujuan)</p>
+            ${recommended.map(g => `<div onclick="processVerificationFromNota('${g.realId}', '${JSON.stringify(itemData).replace(/"/g, '&quot;')}', this)" class="p-4 border-2 border-blue-100 bg-blue-50/20 rounded-[24px] mb-3 flex justify-between items-center cursor-pointer active:scale-95 transition-all"><div class="flex flex-col gap-1 pr-2"><div class="flex items-center gap-2"><span class="text-[11px] font-black text-slate-800 uppercase truncate">${g.nama_barang}</span><span class="text-[8px] font-black bg-blue-100 text-blue-600 px-1.5 rounded">${g.dateStr}</span></div><span class="text-[8px] font-bold text-slate-400 uppercase">Stok: x${g.sisa}</span></div><i data-lucide="star" class="w-5 h-5 text-blue-500 fill-blue-500"></i></div>`).join('')}
+            <div class="space-y-3">${others.map(g => `<div onclick="processVerificationFromNota('${g.realId}', '${JSON.stringify(itemData).replace(/"/g, '&quot;')}', this)" class="p-4 border-2 border-slate-50 rounded-[24px] flex justify-between items-center cursor-pointer active:scale-95 transition-all"><div class="flex flex-col gap-1 pr-2"><div class="flex items-center gap-2"><span class="text-[11px] font-black text-slate-800 uppercase truncate">${g.nama_barang}</span><span class="text-[8px] font-black bg-slate-100 text-slate-500 px-1.5 rounded">${g.dateStr}</span></div><span class="text-[8px] font-bold text-slate-400 uppercase">Stok: x${g.sisa}</span></div><i data-lucide="plus-circle" class="w-5 h-5 text-slate-300"></i></div>`).join('')}</div>`;
             lucide.createIcons();
         }
 
         async function ignoreNotaItem(itemDataStr, element) {
             const itemData = JSON.parse(itemDataStr);
-            const overlay = document.createElement('div');
-            overlay.className = 'syncing-overlay';
-            overlay.innerHTML = `<div class="loader mb-2"></div>`;
+            const overlay = document.createElement('div'); overlay.className = 'syncing-overlay'; overlay.innerHTML = `<div class="loader"></div>`;
             element.classList.add('relative'); element.appendChild(overlay);
-            const itemToSave = [{ parent_id: "IGNORED", transaction_id: "IGNORED", no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: itemData.qty, harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
             try {
+                const itemToSave = [{ parent_id: "IGNORED", transaction_id: "IGNORED", no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: itemData.qty, harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
                 await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) });
-                verifiedItems.push({ ...itemToSave[0] });
-                showAlert("Item berhasil diabaikan"); closeModal(); fetchData();
-            } catch (e) { if (overlay) overlay.remove(); showAlert("Gagal mengabaikan item"); }
+                verifiedItems.push({ ...itemToSave[0] }); showAlert("Diabaikan"); closeModal(); fetchData();
+            } catch (e) { if (overlay) overlay.remove(); }
         }
 
         async function processVerificationFromNota(bmId, itemDataStr, element) {
             const itemData = JSON.parse(itemDataStr);
-            const notaQty = Number(itemData.qty);
-            const bmRaw = allTransactions.find(t => (t.id || t.ID) == bmId);
-            const vCount = verifiedItems.filter(v => v.transaction_id == bmId || v.parent_id == bmId).reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
-            const bmSisa = Number(bmRaw.jumlah || 0) - vCount;
-            if (bmSisa < notaQty) { showAlert("Gagal: Stok gudang tidak cukup"); return; }
-            const overlay = document.createElement('div');
-            overlay.className = 'syncing-overlay';
-            overlay.innerHTML = `<div class="loader mb-2"></div>`;
+            const overlay = document.createElement('div'); overlay.className = 'syncing-overlay'; overlay.innerHTML = `<div class="loader"></div>`;
             element.classList.add('relative'); element.appendChild(overlay);
-            const itemToSave = [{ parent_id: String(bmId), transaction_id: String(bmId), no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: notaQty, harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
             try {
+                const itemToSave = [{ parent_id: String(bmId), transaction_id: String(bmId), no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: Number(itemData.qty), harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
                 await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) });
-                verifiedItems.push({ ...itemToSave[0] });
-                showAlert("Verifikasi Berhasil!"); closeModal(); fetchData();
-            } catch (e) { if (overlay) overlay.remove(); showAlert("Gagal menyimpan data"); }
+                verifiedItems.push({ ...itemToSave[0] }); showAlert("Terverifikasi!"); closeModal(); fetchData();
+            } catch (e) { if (overlay) overlay.remove(); }
         }
 
         function renderBarangMasuk() {
@@ -548,20 +443,20 @@
                     const sisa = Math.max(0, Number(t.jumlah || 0) - vCount);
                     return { ...t, target: Number(t.jumlah || 0), sisa, isLunas: sisa === 0, realId: id };
                 }).filter(t => {
-                    const name = (t.nama_barang || t.Nama_Barang || "").toLowerCase();
-                    const match = name.includes(bmSearchQuery);
+                    const match = (t.nama_barang || t.Nama_Barang || "").toLowerCase().includes(bmSearchQuery);
                     if (currentBMFilter === 'belum') return match && !t.isLunas;
                     if (currentBMFilter === 'selesai') return match && t.isLunas;
                     return match;
                 });
-            if (filtered.length === 0) { container.innerHTML = `<p class="py-20 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p>`; return; }
-            container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `<div onclick="showDetailGudang('${(t.nama_barang || t.Nama_Barang).replace(/'/g, "\\'")}', '${t.target}', '${t.realId}')" class="p-5 flex justify-between items-center cursor-pointer active:bg-slate-50 transition-colors"><div><h4 class="font-black text-sm text-slate-800 uppercase">${t.nama_barang || t.Nama_Barang}</h4><div class="flex gap-2 mt-1"><span class="text-[10px] font-bold text-slate-400 uppercase">Target x${t.target}</span>${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 rounded-lg">Sisa x${t.sisa}</span>` : '<span class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 rounded-lg">Selesai</span>'}</div></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-200"></i></div>`).join('')}</div>`;
+            if (filtered.length === 0) { container.innerHTML = `<p class="py-20 text-center text-[10px] font-black text-slate-400">Data Kosong</p>`; return; }
+            container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `<div onclick="showDetailGudang('${(t.nama_barang || t.Nama_Barang).replace(/'/g, "\\'")}', '${t.target}', '${t.realId}', '${t.created_at || ''}')" class="p-5 flex justify-between items-center cursor-pointer active:bg-slate-50 transition-colors"><div><h4 class="font-black text-sm text-slate-800 uppercase">${t.nama_barang || t.Nama_Barang}</h4><div class="flex gap-2 mt-1"><span class="text-[10px] font-bold text-slate-400 uppercase">x${t.target}</span>${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 rounded-lg">Sisa x${t.sisa}</span>` : '<span class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 rounded-lg">Selesai</span>'}</div></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-200"></i></div>`).join('')}</div>`;
             lucide.createIcons();
         }
 
-        async function showDetailGudang(name, qty, id) {
-            const body = document.getElementById('modal-body');
-            currentContext = { name, qty, id };
+        async function showDetailGudang(name, qty, id, createdAt) {
+            const body = document.getElementById('modal-body'); currentContext = { name, qty, id };
+            const formattedDate = createdAt ? new Date(createdAt).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : 'Tidak Ada Tanggal';
+            
             document.getElementById('modal-title').innerText = "Validasi Stok";
             document.getElementById('modal-container').classList.remove('hidden');
             setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
@@ -569,58 +464,61 @@
             await fetchVerifiedItems();
             const currentVerified = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id);
             baseRemainingQty = Math.max(0, Number(qty) - currentVerified.reduce((acc, curr) => acc + Number(curr.qty || 0), 0));
+            body.innerHTML = `
+            <div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6 text-center">
+                <p class="text-[9px] font-black opacity-40 uppercase mb-1">Stok Masuk: ${formattedDate}</p>
+                <div class="flex justify-center items-center gap-4"><h4 class="text-lg font-black uppercase truncate">${name}</h4><div class="bg-blue-600 px-4 py-2 rounded-2xl text-xs font-black">x${baseRemainingQty}</div></div>
+            </div>
+            ${currentVerified.length > 0 ? `<div class="mb-6 space-y-2">${currentVerified.map(v => `<div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl"><div><div class="flex items-center gap-2"><p class="text-[8px] font-black text-emerald-400 uppercase">${v.no_transaksi}</p><p class="text-[8px] font-black text-slate-400 uppercase">${v.waktu}</p></div><p class="text-[10px] font-bold text-emerald-700 uppercase">${v.nama}</p></div><span class="text-[10px] font-black text-emerald-600">x${v.qty}</span></div>`).join('')}</div>` : ''}
+            
+            <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Pilih Item Nota (Asal)</p>
+            <div id="nota-list" class="space-y-4"></div>`;
+            document.getElementById('modal-footer').classList.toggle('hidden', baseRemainingQty <= 0);
             const searchKey = name.toLowerCase().split(' ')[0];
             const matchingPurchases = sheetPurchases.filter(p => p.itemRaw.toLowerCase().includes(searchKey));
-            body.innerHTML = `<div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6"><p class="text-[9px] font-black opacity-40 uppercase mb-1 text-center">Sisa Stok Barang Masuk</p><div class="flex justify-between items-center"><h4 class="text-lg font-black uppercase truncate pr-4">${name}</h4><div id="rem-badge" class="bg-blue-600 px-4 py-2 rounded-2xl text-xs font-black shadow-lg">x${baseRemainingQty}</div></div></div>${currentVerified.length > 0 ? `<div class="mb-6"><p class="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i data-lucide="check-square" class="w-3 h-3"></i> Terverifikasi</p><div class="space-y-2">${currentVerified.map(v => `<div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl"><div class="overflow-hidden"><p class="text-[8px] font-black text-emerald-400 uppercase truncate">${v.no_transaksi}</p><p class="text-[10px] font-bold text-emerald-700 uppercase truncate">${v.nama}</p></div><span class="text-[10px] font-black text-emerald-600 ml-4 shrink-0">x${v.qty}</span></div>`).join('')}</div></div>` : ''}<p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Nota Terkait</p><div id="nota-list" class="space-y-4"></div>`;
-            document.getElementById('modal-footer').classList.toggle('hidden', baseRemainingQty <= 0);
+            let itemsList = [];
+            matchingPurchases.forEach(p => {
+                let parsed = []; try { parsed = JSON.parse(p.itemRaw); } catch(e) {}
+                parsed.forEach(it => { if (getSimilarityScore(name, it.nama) > 0 && !verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama)) itemsList.push({ ...it, no_transaksi: p.no_transaksi, waktu: p.waktu }); });
+            });
             const list = document.getElementById('nota-list');
-            if (!matchingPurchases.length) list.innerHTML = `<p class="py-12 text-center text-[10px] font-bold text-slate-300 border-2 border-dashed rounded-3xl">Tidak ditemukan nota serupa</p>`;
-            else {
-                let itemsList = [];
-                matchingPurchases.forEach(p => {
-                    let parsed = []; try { parsed = JSON.parse(p.itemRaw); } catch(e) {}
-                    parsed.forEach(it => { if (getSimilarityScore(name, it.nama) > 0 && !verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama)) itemsList.push({ ...it, no_transaksi: p.no_transaksi, waktu: p.waktu, score: getSimilarityScore(name, it.nama) }); });
-                });
-                itemsList.sort((a, b) => b.score - a.score);
-                if(itemsList.length === 0) list.innerHTML = `<p class="py-8 text-center text-[10px] font-bold text-slate-300">Semua nota sudah terverifikasi</p>`;
-                else { list.innerHTML = itemsList.map(it => { const itemDataEscaped = JSON.stringify({parent_id: id, no_transaksi: it.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: it.waktu}).replace(/"/g, '&quot;'); return `<div onclick="handleItemClickFromModal(this, false, '${itemDataEscaped}')" class="p-4 border border-slate-100 rounded-[28px] flex justify-between items-center cursor-pointer transition-all hover:border-blue-300"><div><div class="flex items-center gap-2 mb-1"><p class="text-[9px] font-bold text-slate-400 uppercase">${it.no_transaksi}</p><span class="text-[8px] font-black text-blue-400 bg-blue-50 px-1.5 py-0.5 rounded-md">${it.score}%</span></div><span class="text-[11px] font-bold uppercase text-slate-700">${it.nama}</span></div><div class="flex items-center gap-3"><span class="text-[11px] font-black ${Number(it.qty) > baseRemainingQty ? 'text-red-500' : 'text-slate-500'}">x${it.qty}</span><i data-lucide="plus-circle" class="w-4 h-4 text-slate-200"></i></div></div>`; }).join(''); }
-            }
+            if(itemsList.length === 0) list.innerHTML = `<p class="py-8 text-center text-[10px] font-bold text-slate-300 uppercase">Tidak ada nota terkait</p>`;
+            else list.innerHTML = itemsList.map(it => `<div onclick="handleItemClickFromModal(this, '${JSON.stringify({parent_id: id, no_transaksi: it.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: it.waktu}).replace(/"/g, '&quot;')}')" class="p-4 border border-slate-100 rounded-[28px] flex justify-between items-center cursor-pointer transition-all"><div><div class="flex items-center gap-2 mb-0.5"><p class="text-[9px] font-bold text-slate-400 uppercase">${it.no_transaksi}</p><p class="text-[8px] font-black bg-slate-50 text-slate-400 px-1 rounded">${it.waktu}</p></div><span class="text-[11px] font-bold uppercase text-slate-700 block">${it.nama}</span></div><span class="text-[11px] font-black text-slate-500">x${it.qty}</span></div>`).join('');
             lucide.createIcons();
         }
 
-        async function handleItemClickFromModal(element, isV, dataStr) {
-            if (isV) return;
+        async function handleItemClickFromModal(element, dataStr) {
             const data = JSON.parse(dataStr);
-            if (baseRemainingQty < Number(data.qty)) { showAlert(`Stok gudang kurang (Sisa x${baseRemainingQty})`); return; }
-            const overlay = document.createElement('div');
-            overlay.className = 'syncing-overlay'; overlay.innerHTML = `<div class="loader mb-2"></div>`;
+            if (baseRemainingQty < Number(data.qty)) { showAlert(`Stok kurang`); return; }
+            const overlay = document.createElement('div'); overlay.className = 'syncing-overlay'; overlay.innerHTML = `<div class="loader"></div>`;
             element.classList.add('relative'); element.appendChild(overlay);
             try {
                 await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: [{ ...data, transaction_id: String(data.parent_id) }] }) });
-                verifiedItems.push({ ...data, transaction_id: String(data.parent_id) });
-                showAlert("Berhasil diverifikasi!"); closeModal(); fetchData();
-            } catch (e) { if (overlay) overlay.remove(); showAlert("Koneksi bermasalah"); }
+                verifiedItems.push({ ...data, transaction_id: String(data.parent_id) }); showAlert("Berhasil!"); closeModal(); fetchData();
+            } catch (e) { if (overlay) overlay.remove(); }
         }
 
         async function manualCompletion() {
-            if (baseRemainingQty <= 0) return;
-            const btn = document.getElementById('btn-manual-comp');
-            btn.disabled = true; btn.innerHTML = '<div class="loader mx-auto"></div>';
+            const btn = document.getElementById('btn-manual-comp'); btn.disabled = true; btn.innerHTML = '<div class="loader mx-auto"></div>';
             try {
-                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: [{ parent_id: String(currentContext.id), transaction_id: String(currentContext.id), no_transaksi: "PENYESUAIAN/MANUAL", nama: currentContext.name + " (Manual)", qty: baseRemainingQty, harga: 0, waktu: new Date().toISOString() }] }) });
-                showAlert("Sisa stok berhasil divalidasi!"); closeModal(); fetchData();
-            } catch (e) { btn.disabled = false; btn.innerHTML = 'Gagal penyesuaian'; }
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: [{ parent_id: String(currentContext.id), transaction_id: String(currentContext.id), no_transaksi: "MANUAL", nama: currentContext.name + " (Adj)", qty: baseRemainingQty, harga: 0, waktu: new Date().toISOString() }] }) });
+                showAlert("Selesai!"); closeModal(); fetchData();
+            } catch (e) { btn.disabled = false; btn.innerHTML = 'Gagal'; }
         }
 
         function closeModal() {
-            const backdrop = document.getElementById('modal-backdrop');
-            const content = document.getElementById('modal-content');
-            if(backdrop) backdrop.style.opacity = '0';
-            if(content) content.style.transform = 'translateY(100%)';
-            setTimeout(() => { const modal = document.getElementById('modal-container'); if(modal) modal.classList.add('hidden'); }, 300);
+            const backdrop = document.getElementById('modal-backdrop'); const content = document.getElementById('modal-content');
+            if(backdrop) backdrop.style.opacity = '0'; if(content) content.style.transform = 'translateY(100%)';
+            setTimeout(() => { document.getElementById('modal-container').classList.add('hidden'); }, 300);
         }
 
         function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(n)); }
+        function getSimilarityScore(a, b) { 
+            a = a.toLowerCase(); b = b.toLowerCase();
+            if (a === b) return 100;
+            if (a.includes(b) || b.includes(a)) return 80;
+            return 0;
+        }
     </script>
 </body>
 </html>
