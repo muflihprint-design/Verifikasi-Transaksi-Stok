@@ -285,20 +285,20 @@
             const container = document.getElementById('list-container');
             
             const filtered = sheetPurchases.filter(p => {
-                // Parse items for searching and verification checking
                 let items = [];
                 try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
                 
-                // Cek apakah ada nama barang yang cocok dengan query
                 const matchInItems = items.some(it => it.nama.toLowerCase().includes(bmSearchQuery));
                 const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery);
                 const isMatch = matchInHeader || matchInItems;
                 
-                // Logika Filter Status (Pending/Selesai)
-                const allV = items.length > 0 && items.every(it => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
+                // Cek status semua item di nota ini
+                const allDone = items.length > 0 && items.every(it => 
+                    verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama)
+                );
                 
-                if (currentBMFilter === 'belum') return isMatch && !allV;
-                if (currentBMFilter === 'selesai') return isMatch && allV;
+                if (currentBMFilter === 'belum') return isMatch && !allDone;
+                if (currentBMFilter === 'selesai') return isMatch && allDone;
                 return isMatch;
             });
 
@@ -330,34 +330,35 @@
                         ${items.map(it => {
                             const vRecord = verifiedItems.find(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
                             const isV = !!vRecord;
+                            const isIgnored = isV && vRecord.parent_id === "IGNORED";
                             
-                            let sisaGudangUI = '';
-                            if (isV) {
+                            let statusUI = '';
+                            if (isIgnored) {
+                                statusUI = `<span class="bg-slate-100 text-slate-400 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">DIABAIKAN</span>`;
+                            } else if (isV) {
                                 const parentBM = allTransactions.find(t => (t.id || t.ID) == vRecord.parent_id);
                                 if (parentBM) {
                                     const vCount = verifiedItems.filter(v => v.parent_id == (parentBM.id || parentBM.ID))
                                                    .reduce((acc, curr) => acc + Number(curr.qty), 0);
                                     const sisa = Math.max(0, Number(parentBM.jumlah || 0) - vCount);
-                                    sisaGudangUI = `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Sisa Gudang: x${sisa}</span>`;
+                                    statusUI = `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Sisa Gudang: x${sisa}</span>`;
                                 }
                             }
 
                             const itemDataStr = JSON.stringify({no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;');
-                            
-                            // Highlighting matching search results
                             const isNameMatch = bmSearchQuery && it.nama.toLowerCase().includes(bmSearchQuery);
 
                             return `
                             <div onclick="openStockPicker('${itemDataStr}', ${isV})" 
-                                 class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isNameMatch ? 'ring-2 ring-blue-400 ring-inset' : ''}">
+                                 class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isIgnored ? 'opacity-60 border-slate-200 bg-slate-50' : ''} ${isNameMatch ? 'ring-2 ring-blue-400 ring-inset' : ''}">
                                 <div class="flex justify-between items-center">
                                     <span class="text-[10px] font-bold ${isNameMatch ? 'text-blue-700' : 'text-slate-700'} uppercase truncate pr-4">${it.nama}</span>
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-black text-slate-500">x${it.qty}</span>
-                                        ${isV ? '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i>' : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}
+                                        ${isV ? `<i data-lucide="${isIgnored ? 'eye-off' : 'check-circle'}" class="w-4 h-4 ${isIgnored ? 'text-slate-300' : 'text-emerald-500'}"></i>` : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}
                                     </div>
                                 </div>
-                                ${isV ? `<div class="mt-1 flex items-center gap-2">${sisaGudangUI}</div>` : ''}
+                                ${statusUI ? `<div class="mt-1 flex items-center gap-2">${statusUI}</div>` : ''}
                             </div>`;
                         }).join('')}
                     </div>
@@ -381,7 +382,7 @@
             const itemData = JSON.parse(itemDataStr);
             const body = document.getElementById('modal-body');
             
-            document.getElementById('modal-title').innerText = "Pilih Stok Gudang";
+            document.getElementById('modal-title').innerText = "Opsi Validasi Item";
             document.getElementById('modal-footer').classList.add('hidden');
             document.getElementById('modal-container').classList.remove('hidden');
             setTimeout(() => { 
@@ -426,6 +427,8 @@
                 </div>`;
             };
 
+            const itemDataEscapedForIgnore = JSON.stringify(itemData).replace(/"/g, '&quot;');
+
             body.innerHTML = `
                 <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl mb-6">
                     <div class="flex items-center gap-2 mb-1">
@@ -437,6 +440,15 @@
                         <span class="bg-indigo-600 text-white px-3 py-1 rounded-xl text-[10px] font-black shadow-sm">x${itemData.qty}</span>
                     </div>
                 </div>
+
+                <div class="mb-8">
+                     <button onclick="ignoreNotaItem('${itemDataEscapedForIgnore}', this)" class="w-full p-4 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center gap-3 text-slate-400 hover:border-orange-200 hover:text-orange-500 transition-all group">
+                         <i data-lucide="eye-off" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
+                         <span class="text-[10px] font-black uppercase tracking-wider">Abaikan Item Ini</span>
+                     </button>
+                     <p class="text-[8px] text-center mt-2 text-slate-300 font-bold uppercase tracking-widest px-6 italic">Gunakan jika item ini tidak masuk ke stok gudang</p>
+                </div>
+
                 ${recommended.length > 0 ? `
                     <div class="flex justify-between items-center mb-3 px-1">
                         <p class="text-[9px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
@@ -445,14 +457,50 @@
                     </div>
                     <div class="space-y-3 mb-6">${recommended.map(g => renderItem(g, true)).join('')}</div>
                 ` : ''}
+                
                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">
-                    ${recommended.length > 0 ? 'Stok Gudang Lainnya' : 'Pilih Stok Masuk Gudang'}
+                    Hubungkan ke Stok Gudang
                 </p>
                 <div class="space-y-3">
                     ${others.map(g => renderItem(g, false)).join('')}
                     ${listGudang.length === 0 ? '<div class="py-12 flex flex-col items-center gap-3"><i data-lucide="box" class="w-8 h-8 text-slate-200"></i><p class="text-[10px] font-bold text-slate-300">Gudang Kosong</p></div>' : ''}
                 </div>`;
             lucide.createIcons();
+        }
+
+        async function ignoreNotaItem(itemDataStr, element) {
+            const itemData = JSON.parse(itemDataStr);
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'syncing-overlay';
+            overlay.innerHTML = `<div class="loader mb-2"></div>`;
+            element.classList.add('relative');
+            element.appendChild(overlay);
+
+            const itemToSave = [{
+                parent_id: "IGNORED",
+                transaction_id: "IGNORED",
+                no_transaksi: itemData.no_transaksi,
+                nama: itemData.nama,
+                qty: itemData.qty,
+                harga: Number(itemData.harga),
+                waktu: itemData.waktu || new Date().toISOString()
+            }];
+
+            try {
+                await fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) 
+                });
+                verifiedItems.push({ ...itemToSave[0] });
+                showAlert("Item berhasil diabaikan");
+                closeModal();
+                fetchData();
+            } catch (e) { 
+                if (overlay) overlay.remove(); 
+                showAlert("Gagal mengabaikan item"); 
+            }
         }
 
         async function processVerificationFromNota(bmId, itemDataStr, element) {
