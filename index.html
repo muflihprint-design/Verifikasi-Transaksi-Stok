@@ -6,6 +6,9 @@
   <title>Kasir & Arus Kas Modern</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Library JSPDF & AutoTable untuk export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -88,6 +91,13 @@
 
         <!-- Filter & Search -->
         <div id="search-wrapper" class="hidden space-y-4">
+            <div id="export-container" class="hidden flex justify-end">
+                <button onclick="exportToPDF()" class="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 hover:bg-rose-100 transition-all active:scale-95">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span class="text-[10px] font-black uppercase">Export PDF (Pending)</span>
+                </button>
+            </div>
+
             <div class="relative">
                 <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="search" class="w-4 h-4"></i>
@@ -226,7 +236,14 @@
                 }
                 row.push(val.trim());
                 if (row[3] && row[3].toLowerCase() === 'pembelian') {
-                    result.push({ no_transaksi: row[0], waktu: row[1], keterangan: row[4], keluar: row[6], itemRaw: row[10] || "[]" });
+                    result.push({ 
+                        no_transaksi: row[0], 
+                        waktu: row[1], 
+                        keterangan: row[4], 
+                        keluar: row[6], 
+                        pelanggan: row[8] || "Umum", 
+                        itemRaw: row[10] || "[]" 
+                    });
                 }
             }
             return result;
@@ -237,6 +254,10 @@
                 const nav = document.getElementById('nav-' + t);
                 if (nav) nav.classList.toggle('nav-active', currentTab === t);
             });
+            
+            const exportBtn = document.getElementById('export-container');
+            if (exportBtn) exportBtn.classList.toggle('hidden', currentTab !== 'nota_belanja');
+
             if (currentTab === 'nota_belanja') renderNotaBelanja();
             else if (currentTab === 'barang_masuk') renderBarangMasuk();
             lucide.createIcons();
@@ -283,33 +304,20 @@
 
         function renderNotaBelanja() {
             const container = document.getElementById('list-container');
-            
             const filtered = sheetPurchases.filter(p => {
                 let items = [];
                 try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
-                
                 const matchInItems = items.some(it => it.nama.toLowerCase().includes(bmSearchQuery));
-                const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery);
+                const matchInHeader = p.no_transaksi.toLowerCase().includes(bmSearchQuery) || p.keterangan.toLowerCase().includes(bmSearchQuery) || p.pelanggan.toLowerCase().includes(bmSearchQuery);
                 const isMatch = matchInHeader || matchInItems;
-                
-                // Cek status semua item di nota ini
-                const allDone = items.length > 0 && items.every(it => 
-                    verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama)
-                );
-                
+                const allDone = items.length > 0 && items.every(it => verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
                 if (currentBMFilter === 'belum') return isMatch && !allDone;
                 if (currentBMFilter === 'selesai') return isMatch && allDone;
                 return isMatch;
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                <div class="py-20 text-center space-y-4">
-                    <div class="inline-flex p-4 bg-slate-50 rounded-full text-slate-300">
-                         <i data-lucide="search-x" class="w-10 h-10"></i>
-                    </div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p>
-                </div>`;
+                container.innerHTML = `<div class="py-20 text-center space-y-4"><div class="inline-flex p-4 bg-slate-50 rounded-full text-slate-300"><i data-lucide="search-x" class="w-10 h-10"></i></div><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p></div>`;
                 lucide.createIcons();
                 return;
             }
@@ -323,6 +331,7 @@
                         <div>
                             <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${p.waktu}</p>
                             <h4 class="font-black text-slate-800 text-sm">${p.no_transaksi}</h4>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase mt-0.5">${p.pelanggan}</p>
                         </div>
                         <span class="bg-red-50 text-red-600 px-3 py-1 rounded-xl text-[10px] font-black">-${formatRupiah(p.keluar)}</span>
                     </div>
@@ -331,38 +340,127 @@
                             const vRecord = verifiedItems.find(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
                             const isV = !!vRecord;
                             const isIgnored = isV && vRecord.parent_id === "IGNORED";
-                            
                             let statusUI = '';
-                            if (isIgnored) {
-                                statusUI = `<span class="bg-slate-100 text-slate-400 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">DIABAIKAN</span>`;
-                            } else if (isV) {
+                            if (isIgnored) statusUI = `<span class="bg-slate-100 text-slate-400 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">DIABAIKAN</span>`;
+                            else if (isV) {
                                 const parentBM = allTransactions.find(t => (t.id || t.ID) == vRecord.parent_id);
                                 if (parentBM) {
-                                    const vCount = verifiedItems.filter(v => v.parent_id == (parentBM.id || parentBM.ID))
-                                                   .reduce((acc, curr) => acc + Number(curr.qty), 0);
+                                    const vCount = verifiedItems.filter(v => v.parent_id == (parentBM.id || parentBM.ID)).reduce((acc, curr) => acc + Number(curr.qty), 0);
                                     const sisa = Math.max(0, Number(parentBM.jumlah || 0) - vCount);
                                     statusUI = `<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Sisa Gudang: x${sisa}</span>`;
                                 }
                             }
-
                             const itemDataStr = JSON.stringify({no_transaksi: p.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: p.waktu}).replace(/"/g, '&quot;');
-                            const isNameMatch = bmSearchQuery && it.nama.toLowerCase().includes(bmSearchQuery);
-
-                            return `
-                            <div onclick="openStockPicker('${itemDataStr}', ${isV})" 
-                                 class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isIgnored ? 'opacity-60 border-slate-200 bg-slate-50' : ''} ${isNameMatch ? 'ring-2 ring-blue-400 ring-inset' : ''}">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-bold ${isNameMatch ? 'text-blue-700' : 'text-slate-700'} uppercase truncate pr-4">${it.nama}</span>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[10px] font-black text-slate-500">x${it.qty}</span>
-                                        ${isV ? `<i data-lucide="${isIgnored ? 'eye-off' : 'check-circle'}" class="w-4 h-4 ${isIgnored ? 'text-slate-300' : 'text-emerald-500'}"></i>` : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}
-                                    </div>
-                                </div>
-                                ${statusUI ? `<div class="mt-1 flex items-center gap-2">${statusUI}</div>` : ''}
-                            </div>`;
+                            return `<div onclick="openStockPicker('${itemDataStr}', ${isV})" class="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border cursor-pointer active:scale-95 transition-all hover:border-blue-200 ${isV ? 'border-emerald-100 bg-emerald-50/20' : ''} ${isIgnored ? 'opacity-60' : ''}"><div class="flex justify-between items-center"><span class="text-[10px] font-bold text-slate-700 uppercase truncate pr-4">${it.nama}</span><div class="flex items-center gap-2"><span class="text-[10px] font-black text-slate-500">x${it.qty}</span>${isV ? `<i data-lucide="${isIgnored ? 'eye-off' : 'check-circle'}" class="w-4 h-4 ${isIgnored ? 'text-slate-300' : 'text-emerald-500'}"></i>` : '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>'}</div></div>${statusUI ? `<div class="mt-1 flex items-center gap-2">${statusUI}</div>` : ''}</div>`;
                         }).join('')}
                     </div>
                 </div>`}).join('');
+        }
+
+        async function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const now = new Date().toLocaleString('id-ID');
+            const pageMaxWidth = 182; // Area cetak standar A4 (210mm - margin)
+
+            doc.setFontSize(14);
+            doc.setTextColor(37, 99, 235);
+            doc.setFont(undefined, 'bold');
+            doc.text("LAPORAN NOTA BELANJA PENDING", 14, 20);
+            
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Dicetak pada: ${now}`, 14, 25);
+
+            const pendingNotes = sheetPurchases.filter(p => {
+                let items = [];
+                try { items = JSON.parse(p.itemRaw); } catch(e) { items = []; }
+                return items.length > 0 && items.some(it => !verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama));
+            });
+
+            if (pendingNotes.length === 0) {
+                showAlert("Tidak ada nota pending untuk di-export.");
+                return;
+            }
+
+            let startY = 35;
+
+            pendingNotes.forEach((p, index) => {
+                let items = [];
+                try { items = JSON.parse(p.itemRaw); } catch(e) {}
+
+                // Validasi sisa ruang di halaman
+                if (startY > 240) {
+                    doc.addPage();
+                    startY = 20;
+                }
+
+                // Header Transaksi
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(248, 250, 252);
+                doc.roundedRect(14, startY - 5, pageMaxWidth, 16, 2, 2, 'FD');
+
+                doc.setFontSize(9);
+                doc.setTextColor(30, 41, 59);
+                doc.setFont(undefined, 'bold');
+                doc.text(`${p.no_transaksi}`, 18, startY + 1);
+                
+                doc.setFontSize(8);
+                doc.setTextColor(37, 99, 235);
+                doc.text(`Pelanggan: ${p.pelanggan}`, 18, startY + 6);
+
+                doc.setTextColor(100, 116, 139);
+                doc.setFont(undefined, 'normal');
+                doc.text(`${p.waktu}`, 145, startY + 1);
+                doc.text(`Ket: ${p.keterangan || "-"}`, 145, startY + 6);
+
+                let subtotal = 0;
+                const tableData = items.map(it => {
+                    const itemTotal = Number(it.qty || 0) * Number(it.harga || 0);
+                    subtotal += itemTotal;
+                    const v = verifiedItems.find(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
+                    let status = "PENDING";
+                    if(v) status = v.parent_id === "IGNORED" ? "DIABAIKAN" : "VERIFIED";
+                    return [it.nama, it.qty, formatRupiah(it.harga || 0), formatRupiah(itemTotal), status];
+                });
+
+                doc.autoTable({
+                    startY: startY + 13,
+                    margin: { left: 14, right: 14 },
+                    head: [['Nama Barang', 'Qty', 'Harga Satuan', 'Total', 'Status']],
+                    body: tableData,
+                    theme: 'grid',
+                    styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
+                    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' },
+                    // Fix Lebar Kolom: Total Lebar Harus <= pageMaxWidth (182)
+                    columnStyles: {
+                        0: { cellWidth: 70 }, // Nama Barang
+                        1: { cellWidth: 15, halign: 'center' }, // Qty
+                        2: { cellWidth: 32, halign: 'right' }, // Harga Satuan
+                        3: { cellWidth: 35, halign: 'right' }, // Total
+                        4: { cellWidth: 30, halign: 'center' }  // Status
+                    },
+                    didParseCell: function(data) {
+                        if (data.column.index === 4) {
+                            if (data.cell.text[0] === 'VERIFIED') data.cell.styles.textColor = [16, 185, 129];
+                            if (data.cell.text[0] === 'PENDING') data.cell.styles.textColor = [239, 68, 68];
+                        }
+                    }
+                });
+
+                const finalY = doc.lastAutoTable.finalY;
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(30, 41, 59);
+                doc.text(`Subtotal Nota:`, 130, finalY + 6);
+                doc.text(`${formatRupiah(subtotal)}`, 166, finalY + 6, { align: 'right' });
+
+                startY = finalY + 18;
+            });
+
+            doc.save(`Laporan_Pending_${new Date().getTime()}.pdf`);
+            showAlert("PDF Berhasil di-export");
         }
 
         function getSimilarityScore(itemName, stockName) {
@@ -381,7 +479,6 @@
             if (isVerified) return;
             const itemData = JSON.parse(itemDataStr);
             const body = document.getElementById('modal-body');
-            
             document.getElementById('modal-title').innerText = "Opsi Validasi Item";
             document.getElementById('modal-footer').classList.add('hidden');
             document.getElementById('modal-container').classList.remove('hidden');
@@ -389,163 +486,57 @@
                 document.getElementById('modal-backdrop').style.opacity = '1'; 
                 document.getElementById('modal-content').style.transform = 'translateY(0)'; 
             }, 10);
-
             body.innerHTML = `<div class="flex justify-center py-12"><div class="loader"></div></div>`;
-            
             const listGudang = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK')
                 .map(t => {
                     const id = t.id || t.ID;
-                    const target = Number(t.jumlah || 0);
-                    const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id)
-                                   .reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
-                    const sisa = Math.max(0, target - vCount);
+                    const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id).reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
+                    const sisa = Math.max(0, Number(t.jumlah || 0) - vCount);
                     const similarity = getSimilarityScore(itemData.nama, (t.nama_barang || t.Nama_Barang || ""));
                     return { ...t, sisa, realId: id, similarity, nama_barang: t.nama_barang || t.Nama_Barang };
-                })
-                .filter(t => t.sisa > 0);
-
+                }).filter(t => t.sisa > 0);
             const recommended = listGudang.filter(g => g.similarity > 0).sort((a, b) => b.similarity - a.similarity);
             const others = listGudang.filter(g => g.similarity === 0).sort((a, b) => a.nama_barang.localeCompare(b.nama_barang));
-
             const renderItem = (g, isRec) => {
-                const isMatchQty = Number(g.sisa) === Number(itemData.qty);
                 const itemDataEscaped = JSON.stringify(itemData).replace(/"/g, '&quot;');
-                return `
-                <div onclick="processVerificationFromNota('${g.realId}', '${itemDataEscaped}', this)" 
-                     class="p-4 border-2 ${isRec ? 'border-blue-100 bg-blue-50/20' : 'border-slate-50'} rounded-[24px] flex justify-between items-center cursor-pointer hover:border-blue-400 active:scale-95 transition-all">
-                    <div class="flex flex-col gap-1 overflow-hidden pr-2">
-                        <span class="text-[11px] font-black text-slate-800 uppercase truncate">${g.nama_barang}</span>
-                        <div class="flex gap-2">
-                            <span class="text-[9px] font-bold text-slate-400 uppercase">Gudang: x${g.sisa}</span>
-                            ${isMatchQty ? '<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase">Qty Match</span>' : ''}
-                        </div>
-                    </div>
-                    <div class="shrink-0 flex items-center">
-                        ${isRec ? `<span class="mr-2 text-[8px] font-black text-blue-400">${g.similarity}%</span>` : ''}
-                        <i data-lucide="${isRec ? 'star' : 'plus-circle'}" class="w-5 h-5 ${isRec ? 'text-blue-500 fill-blue-500' : 'text-slate-300'}"></i>
-                    </div>
-                </div>`;
+                return `<div onclick="processVerificationFromNota('${g.realId}', '${itemDataEscaped}', this)" class="p-4 border-2 ${isRec ? 'border-blue-100 bg-blue-50/20' : 'border-slate-50'} rounded-[24px] flex justify-between items-center cursor-pointer active:scale-95 transition-all"><div class="flex flex-col gap-1 overflow-hidden pr-2"><span class="text-[11px] font-black text-slate-800 uppercase truncate">${g.nama_barang}</span><span class="text-[9px] font-bold text-slate-400 uppercase">Gudang: x${g.sisa}</span></div><div class="shrink-0 flex items-center">${isRec ? `<span class="mr-2 text-[8px] font-black text-blue-400">${g.similarity}%</span>` : ''}<i data-lucide="${isRec ? 'star' : 'plus-circle'}" class="w-5 h-5 ${isRec ? 'text-blue-500 fill-blue-500' : 'text-slate-300'}"></i></div></div>`;
             };
-
             const itemDataEscapedForIgnore = JSON.stringify(itemData).replace(/"/g, '&quot;');
-
-            body.innerHTML = `
-                <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl mb-6">
-                    <div class="flex items-center gap-2 mb-1">
-                         <i data-lucide="info" class="w-3 h-3 text-indigo-400"></i>
-                         <p class="text-[8px] font-black text-indigo-400 uppercase">Item Nota Terpilih</p>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-black text-indigo-700 uppercase">${itemData.nama}</span>
-                        <span class="bg-indigo-600 text-white px-3 py-1 rounded-xl text-[10px] font-black shadow-sm">x${itemData.qty}</span>
-                    </div>
-                </div>
-
-                <div class="mb-8">
-                     <button onclick="ignoreNotaItem('${itemDataEscapedForIgnore}', this)" class="w-full p-4 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center gap-3 text-slate-400 hover:border-orange-200 hover:text-orange-500 transition-all group">
-                         <i data-lucide="eye-off" class="w-5 h-5 group-hover:scale-110 transition-transform"></i>
-                         <span class="text-[10px] font-black uppercase tracking-wider">Abaikan Item Ini</span>
-                     </button>
-                     <p class="text-[8px] text-center mt-2 text-slate-300 font-bold uppercase tracking-widest px-6 italic">Gunakan jika item ini tidak masuk ke stok gudang</p>
-                </div>
-
-                ${recommended.length > 0 ? `
-                    <div class="flex justify-between items-center mb-3 px-1">
-                        <p class="text-[9px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                            <i data-lucide="zap" class="w-3 h-3"></i> Sangat Cocok
-                        </p>
-                    </div>
-                    <div class="space-y-3 mb-6">${recommended.map(g => renderItem(g, true)).join('')}</div>
-                ` : ''}
-                
-                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">
-                    Hubungkan ke Stok Gudang
-                </p>
-                <div class="space-y-3">
-                    ${others.map(g => renderItem(g, false)).join('')}
-                    ${listGudang.length === 0 ? '<div class="py-12 flex flex-col items-center gap-3"><i data-lucide="box" class="w-8 h-8 text-slate-200"></i><p class="text-[10px] font-bold text-slate-300">Gudang Kosong</p></div>' : ''}
-                </div>`;
+            body.innerHTML = `<div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl mb-6"><p class="text-[8px] font-black text-indigo-400 uppercase mb-1">Item Nota Terpilih</p><div class="flex justify-between items-center"><span class="text-xs font-black text-indigo-700 uppercase">${itemData.nama}</span><span class="bg-indigo-600 text-white px-3 py-1 rounded-xl text-[10px] font-black">x${itemData.qty}</span></div></div><div class="mb-8"><button onclick="ignoreNotaItem('${itemDataEscapedForIgnore}', this)" class="w-full p-4 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center gap-3 text-slate-400 group"><i data-lucide="eye-off" class="w-5 h-5 group-hover:scale-110"></i><span class="text-[10px] font-black uppercase">Abaikan Item Ini</span></button></div>${recommended.length > 0 ? `<p class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Sangat Cocok</p><div class="space-y-3 mb-6">${recommended.map(g => renderItem(g, true)).join('')}</div>` : ''}<p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Hubungkan ke Stok Gudang</p><div class="space-y-3">${others.map(g => renderItem(g, false)).join('')}${listGudang.length === 0 ? '<p class="text-center text-[10px] py-10 text-slate-300">Gudang Kosong</p>' : ''}</div>`;
             lucide.createIcons();
         }
 
         async function ignoreNotaItem(itemDataStr, element) {
             const itemData = JSON.parse(itemDataStr);
-            
             const overlay = document.createElement('div');
             overlay.className = 'syncing-overlay';
             overlay.innerHTML = `<div class="loader mb-2"></div>`;
-            element.classList.add('relative');
-            element.appendChild(overlay);
-
-            const itemToSave = [{
-                parent_id: "IGNORED",
-                transaction_id: "IGNORED",
-                no_transaksi: itemData.no_transaksi,
-                nama: itemData.nama,
-                qty: itemData.qty,
-                harga: Number(itemData.harga),
-                waktu: itemData.waktu || new Date().toISOString()
-            }];
-
+            element.classList.add('relative'); element.appendChild(overlay);
+            const itemToSave = [{ parent_id: "IGNORED", transaction_id: "IGNORED", no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: itemData.qty, harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
             try {
-                await fetch(APPS_SCRIPT_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) 
-                });
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) });
                 verifiedItems.push({ ...itemToSave[0] });
-                showAlert("Item berhasil diabaikan");
-                closeModal();
-                fetchData();
-            } catch (e) { 
-                if (overlay) overlay.remove(); 
-                showAlert("Gagal mengabaikan item"); 
-            }
+                showAlert("Item berhasil diabaikan"); closeModal(); fetchData();
+            } catch (e) { if (overlay) overlay.remove(); showAlert("Gagal mengabaikan item"); }
         }
 
         async function processVerificationFromNota(bmId, itemDataStr, element) {
             const itemData = JSON.parse(itemDataStr);
             const notaQty = Number(itemData.qty);
             const bmRaw = allTransactions.find(t => (t.id || t.ID) == bmId);
-            const vCount = verifiedItems.filter(v => v.transaction_id == bmId || v.parent_id == bmId)
-                           .reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
+            const vCount = verifiedItems.filter(v => v.transaction_id == bmId || v.parent_id == bmId).reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
             const bmSisa = Number(bmRaw.jumlah || 0) - vCount;
-
-            if (bmSisa < notaQty) {
-                showAlert("Gagal: Stok gudang tidak cukup");
-                return;
-            }
-
+            if (bmSisa < notaQty) { showAlert("Gagal: Stok gudang tidak cukup"); return; }
             const overlay = document.createElement('div');
             overlay.className = 'syncing-overlay';
             overlay.innerHTML = `<div class="loader mb-2"></div>`;
-            element.classList.add('relative');
-            element.appendChild(overlay);
-
-            const itemToSave = [{
-                parent_id: String(bmId),
-                transaction_id: String(bmId),
-                no_transaksi: itemData.no_transaksi,
-                nama: itemData.nama,
-                qty: notaQty,
-                harga: Number(itemData.harga),
-                waktu: itemData.waktu || new Date().toISOString()
-            }];
-
+            element.classList.add('relative'); element.appendChild(overlay);
+            const itemToSave = [{ parent_id: String(bmId), transaction_id: String(bmId), no_transaksi: itemData.no_transaksi, nama: itemData.nama, qty: notaQty, harga: Number(itemData.harga), waktu: itemData.waktu || new Date().toISOString() }];
             try {
-                await fetch(APPS_SCRIPT_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) 
-                });
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) });
                 verifiedItems.push({ ...itemToSave[0] });
-                showAlert("Verifikasi Berhasil!");
-                closeModal();
-                fetchData();
-            } catch (e) { 
-                if (overlay) overlay.remove(); 
-                showAlert("Gagal menyimpan data"); 
-            }
+                showAlert("Verifikasi Berhasil!"); closeModal(); fetchData();
+            } catch (e) { if (overlay) overlay.remove(); showAlert("Gagal menyimpan data"); }
         }
 
         function renderBarangMasuk() {
@@ -553,36 +544,19 @@
             const filtered = allTransactions.filter(t => (t.Jenis || t.jenis || "").toString().toUpperCase() === 'BARANG MASUK')
                 .map(t => {
                     const id = t.id || t.ID;
-                    const target = Number(t.jumlah || 0);
-                    const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id)
-                                   .reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
-                    const sisa = Math.max(0, target - vCount);
-                    return { ...t, target, sisa, isLunas: sisa === 0, realId: id };
-                })
-                .filter(t => {
+                    const vCount = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id).reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
+                    const sisa = Math.max(0, Number(t.jumlah || 0) - vCount);
+                    return { ...t, target: Number(t.jumlah || 0), sisa, isLunas: sisa === 0, realId: id };
+                }).filter(t => {
                     const name = (t.nama_barang || t.Nama_Barang || "").toLowerCase();
                     const match = name.includes(bmSearchQuery);
                     if (currentBMFilter === 'belum') return match && !t.isLunas;
                     if (currentBMFilter === 'selesai') return match && t.isLunas;
                     return match;
                 });
-
-            if (filtered.length === 0) {
-                 container.innerHTML = `<div class="py-20 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Barang Masuk Tidak Ditemukan</div>`;
-                 return;
-            }
-
-            container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `
-                <div onclick="showDetailGudang('${(t.nama_barang || t.Nama_Barang).replace(/'/g, "\\'")}', '${t.target}', '${t.realId}')" class="p-5 flex justify-between items-center cursor-pointer active:bg-slate-50 transition-colors">
-                    <div>
-                        <h4 class="font-black text-sm text-slate-800 uppercase">${t.nama_barang || t.Nama_Barang}</h4>
-                        <div class="flex gap-2 mt-1">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase">Target x${t.target}</span>
-                            ${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 rounded-lg">Sisa x${t.sisa}</span>` : '<span class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 rounded-lg">Selesai</span>'}
-                        </div>
-                    </div>
-                    <i data-lucide="chevron-right" class="w-5 h-5 text-slate-200"></i>
-                </div>`).join('')}</div>`;
+            if (filtered.length === 0) { container.innerHTML = `<p class="py-20 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Tidak Ditemukan</p>`; return; }
+            container.innerHTML = `<div class="bg-white rounded-[32px] border divide-y divide-slate-50">${filtered.map(t => `<div onclick="showDetailGudang('${(t.nama_barang || t.Nama_Barang).replace(/'/g, "\\'")}', '${t.target}', '${t.realId}')" class="p-5 flex justify-between items-center cursor-pointer active:bg-slate-50 transition-colors"><div><h4 class="font-black text-sm text-slate-800 uppercase">${t.nama_barang || t.Nama_Barang}</h4><div class="flex gap-2 mt-1"><span class="text-[10px] font-bold text-slate-400 uppercase">Target x${t.target}</span>${!t.isLunas ? `<span class="bg-orange-50 text-orange-600 text-[10px] font-black px-2 rounded-lg">Sisa x${t.sisa}</span>` : '<span class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 rounded-lg">Selesai</span>'}</div></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-200"></i></div>`).join('')}</div>`;
+            lucide.createIcons();
         }
 
         async function showDetailGudang(name, qty, id) {
@@ -590,100 +564,26 @@
             currentContext = { name, qty, id };
             document.getElementById('modal-title').innerText = "Validasi Stok";
             document.getElementById('modal-container').classList.remove('hidden');
-            setTimeout(() => { 
-                document.getElementById('modal-backdrop').style.opacity = '1'; 
-                document.getElementById('modal-content').style.transform = 'translateY(0)'; 
-            }, 10);
-            
+            setTimeout(() => { document.getElementById('modal-backdrop').style.opacity = '1'; document.getElementById('modal-content').style.transform = 'translateY(0)'; }, 10);
             body.innerHTML = `<div class="flex justify-center py-12"><div class="loader"></div></div>`;
             await fetchVerifiedItems();
-            
             const currentVerified = verifiedItems.filter(v => v.transaction_id == id || v.parent_id == id);
-            const vCount = currentVerified.reduce((acc, curr) => acc + Number(curr.qty || 0), 0);
-            baseRemainingQty = Math.max(0, Number(qty) - vCount);
-
+            baseRemainingQty = Math.max(0, Number(qty) - currentVerified.reduce((acc, curr) => acc + Number(curr.qty || 0), 0));
             const searchKey = name.toLowerCase().split(' ')[0];
             const matchingPurchases = sheetPurchases.filter(p => p.itemRaw.toLowerCase().includes(searchKey));
-
-            body.innerHTML = `
-                <div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6">
-                    <p class="text-[9px] font-black opacity-40 uppercase mb-1 text-center">Sisa Stok Barang Masuk</p>
-                    <div class="flex justify-between items-center">
-                        <h4 class="text-lg font-black uppercase truncate mr-4">${name}</h4>
-                        <div id="rem-badge" class="bg-blue-600 px-4 py-2 rounded-2xl text-xs font-black shadow-lg">x${baseRemainingQty}</div>
-                    </div>
-                </div>
-
-                ${currentVerified.length > 0 ? `
-                <div class="mb-6">
-                    <p class="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                         <i data-lucide="check-square" class="w-3 h-3"></i> Terverifikasi (Total x${vCount})
-                    </p>
-                    <div class="space-y-2">
-                        ${currentVerified.map(v => `
-                        <div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
-                            <div class="overflow-hidden">
-                                <p class="text-[8px] font-black text-emerald-400 uppercase truncate">${v.no_transaksi}</p>
-                                <p class="text-[10px] font-bold text-emerald-700 uppercase truncate">${v.nama}</p>
-                            </div>
-                            <span class="text-[10px] font-black text-emerald-600 ml-4 shrink-0">x${v.qty}</span>
-                        </div>
-                        `).join('')}
-                    </div>
-                </div>
-                ` : ''}
-
-                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <i data-lucide="link" class="w-3 h-3"></i> Cari kecocokan di Nota
-                </p>
-                <div id="nota-list" class="space-y-4"></div>`;
-
-            if (baseRemainingQty > 0) {
-                document.getElementById('modal-footer').classList.remove('hidden');
-            } else {
-                document.getElementById('modal-footer').classList.add('hidden');
-            }
-
+            body.innerHTML = `<div class="p-5 bg-slate-900 rounded-[28px] text-white mb-6"><p class="text-[9px] font-black opacity-40 uppercase mb-1 text-center">Sisa Stok Barang Masuk</p><div class="flex justify-between items-center"><h4 class="text-lg font-black uppercase truncate pr-4">${name}</h4><div id="rem-badge" class="bg-blue-600 px-4 py-2 rounded-2xl text-xs font-black shadow-lg">x${baseRemainingQty}</div></div></div>${currentVerified.length > 0 ? `<div class="mb-6"><p class="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i data-lucide="check-square" class="w-3 h-3"></i> Terverifikasi</p><div class="space-y-2">${currentVerified.map(v => `<div class="flex justify-between items-center p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl"><div class="overflow-hidden"><p class="text-[8px] font-black text-emerald-400 uppercase truncate">${v.no_transaksi}</p><p class="text-[10px] font-bold text-emerald-700 uppercase truncate">${v.nama}</p></div><span class="text-[10px] font-black text-emerald-600 ml-4 shrink-0">x${v.qty}</span></div>`).join('')}</div></div>` : ''}<p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Nota Terkait</p><div id="nota-list" class="space-y-4"></div>`;
+            document.getElementById('modal-footer').classList.toggle('hidden', baseRemainingQty <= 0);
             const list = document.getElementById('nota-list');
-            if (!matchingPurchases.length) {
-                list.innerHTML = `<div class="py-12 text-center text-[10px] font-bold text-slate-300 border-2 border-dashed rounded-3xl">Tidak ditemukan item nota serupa</div>`;
-            } else {
+            if (!matchingPurchases.length) list.innerHTML = `<p class="py-12 text-center text-[10px] font-bold text-slate-300 border-2 border-dashed rounded-3xl">Tidak ditemukan nota serupa</p>`;
+            else {
                 let itemsList = [];
                 matchingPurchases.forEach(p => {
-                    let parsed = [];
-                    try { parsed = JSON.parse(p.itemRaw); } catch(e) {}
-                    parsed.forEach(it => {
-                        const score = getSimilarityScore(name, it.nama);
-                        if (score > 0) {
-                            const isV = verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama);
-                            if(!isV) itemsList.push({ ...it, no_transaksi: p.no_transaksi, waktu: p.waktu, score });
-                        }
-                    });
+                    let parsed = []; try { parsed = JSON.parse(p.itemRaw); } catch(e) {}
+                    parsed.forEach(it => { if (getSimilarityScore(name, it.nama) > 0 && !verifiedItems.some(v => v.no_transaksi === p.no_transaksi && v.nama === it.nama)) itemsList.push({ ...it, no_transaksi: p.no_transaksi, waktu: p.waktu, score: getSimilarityScore(name, it.nama) }); });
                 });
-                
                 itemsList.sort((a, b) => b.score - a.score);
-                
-                if(itemsList.length === 0) {
-                    list.innerHTML = `<div class="py-8 text-center text-[10px] font-bold text-slate-300">Semua nota terkait sudah terverifikasi</div>`;
-                } else {
-                    list.innerHTML = itemsList.map(it => {
-                        const itemDataEscaped = JSON.stringify({parent_id: id, no_transaksi: it.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: it.waktu}).replace(/"/g, '&quot;');
-                        return `
-                            <div onclick="handleItemClickFromModal(this, false, '${itemDataEscaped}')" class="p-4 border border-slate-100 rounded-[28px] flex justify-between items-center cursor-pointer transition-all hover:border-blue-300 active:scale-95">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <p class="text-[9px] font-bold text-slate-400 uppercase">${it.no_transaksi}</p>
-                                        <span class="text-[8px] font-black text-blue-400 bg-blue-50 px-1.5 py-0.5 rounded-md">${it.score}%</span>
-                                    </div>
-                                    <span class="text-[11px] font-bold uppercase text-slate-700">${it.nama}</span>
-                                </div>
-                                <div class="text-right flex items-center gap-3">
-                                    <span class="block text-[11px] font-black ${Number(it.qty) > baseRemainingQty ? 'text-red-500' : 'text-slate-500'}">x${it.qty}</span>
-                                    <i data-lucide="plus-circle" class="w-4 h-4 text-slate-200"></i>
-                                </div>
-                            </div>`;
-                    }).join('');
-                }
+                if(itemsList.length === 0) list.innerHTML = `<p class="py-8 text-center text-[10px] font-bold text-slate-300">Semua nota sudah terverifikasi</p>`;
+                else { list.innerHTML = itemsList.map(it => { const itemDataEscaped = JSON.stringify({parent_id: id, no_transaksi: it.no_transaksi, nama: it.nama, qty: it.qty, harga: it.harga || 0, waktu: it.waktu}).replace(/"/g, '&quot;'); return `<div onclick="handleItemClickFromModal(this, false, '${itemDataEscaped}')" class="p-4 border border-slate-100 rounded-[28px] flex justify-between items-center cursor-pointer transition-all hover:border-blue-300"><div><div class="flex items-center gap-2 mb-1"><p class="text-[9px] font-bold text-slate-400 uppercase">${it.no_transaksi}</p><span class="text-[8px] font-black text-blue-400 bg-blue-50 px-1.5 py-0.5 rounded-md">${it.score}%</span></div><span class="text-[11px] font-bold uppercase text-slate-700">${it.nama}</span></div><div class="flex items-center gap-3"><span class="text-[11px] font-black ${Number(it.qty) > baseRemainingQty ? 'text-red-500' : 'text-slate-500'}">x${it.qty}</span><i data-lucide="plus-circle" class="w-4 h-4 text-slate-200"></i></div></div>`; }).join(''); }
             }
             lucide.createIcons();
         }
@@ -691,71 +591,25 @@
         async function handleItemClickFromModal(element, isV, dataStr) {
             if (isV) return;
             const data = JSON.parse(dataStr);
-            if (baseRemainingQty < Number(data.qty)) {
-                showAlert(`Gagal: Stok gudang kurang (Sisa x${baseRemainingQty})`);
-                return;
-            }
+            if (baseRemainingQty < Number(data.qty)) { showAlert(`Stok gudang kurang (Sisa x${baseRemainingQty})`); return; }
             const overlay = document.createElement('div');
-            overlay.className = 'syncing-overlay';
-            overlay.innerHTML = `<div class="loader mb-2"></div>`;
-            element.classList.add('relative');
-            element.appendChild(overlay);
+            overlay.className = 'syncing-overlay'; overlay.innerHTML = `<div class="loader mb-2"></div>`;
+            element.classList.add('relative'); element.appendChild(overlay);
             try {
-                const itemToSave = [{ ...data, transaction_id: String(data.parent_id) }];
-                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: itemToSave }) });
-                verifiedItems.push(itemToSave[0]);
-                baseRemainingQty -= Number(data.qty);
-                
-                const badge = document.getElementById('rem-badge');
-                if (badge) badge.innerText = baseRemainingQty === 0 ? 'SELESAI' : `x${baseRemainingQty}`;
-                
-                element.classList.add('opacity-30', 'pointer-events-none');
-                if (overlay) overlay.remove();
-                
-                showAlert("Berhasil diverifikasi!");
-                if(baseRemainingQty === 0) {
-                    setTimeout(() => { closeModal(); fetchData(); }, 1000);
-                } else {
-                    showDetailGudang(currentContext.name, currentContext.qty, currentContext.id);
-                }
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: [{ ...data, transaction_id: String(data.parent_id) }] }) });
+                verifiedItems.push({ ...data, transaction_id: String(data.parent_id) });
+                showAlert("Berhasil diverifikasi!"); closeModal(); fetchData();
             } catch (e) { if (overlay) overlay.remove(); showAlert("Koneksi bermasalah"); }
         }
 
         async function manualCompletion() {
             if (baseRemainingQty <= 0) return;
-            
             const btn = document.getElementById('btn-manual-comp');
-            const originalContent = btn.innerHTML;
-            btn.disabled = true; 
-            btn.innerHTML = '<div class="loader mx-auto"></div>';
-            
-            const item = [{ 
-                parent_id: String(currentContext.id), 
-                transaction_id: String(currentContext.id), 
-                no_transaksi: "BONUS/MANUAL", 
-                nama: currentContext.name + " (Penyesuaian)", 
-                qty: baseRemainingQty, 
-                harga: 0, 
-                waktu: new Date().toISOString() 
-            }];
-
+            btn.disabled = true; btn.innerHTML = '<div class="loader mx-auto"></div>';
             try {
-                await fetch(APPS_SCRIPT_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ 
-                        action: 'add_verified_items', 
-                        spreadsheet_id: SPREADSHEET_ID, 
-                        items: item 
-                    }) 
-                });
-                showAlert("Sisa stok berhasil dimasukkan!");
-                setTimeout(() => { closeModal(); fetchData(); }, 500);
-            } catch (e) { 
-                btn.disabled = false; 
-                btn.innerHTML = originalContent; 
-                showAlert("Gagal melakukan penyesuaian");
-            }
+                await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'add_verified_items', spreadsheet_id: SPREADSHEET_ID, items: [{ parent_id: String(currentContext.id), transaction_id: String(currentContext.id), no_transaksi: "PENYESUAIAN/MANUAL", nama: currentContext.name + " (Manual)", qty: baseRemainingQty, harga: 0, waktu: new Date().toISOString() }] }) });
+                showAlert("Sisa stok berhasil divalidasi!"); closeModal(); fetchData();
+            } catch (e) { btn.disabled = false; btn.innerHTML = 'Gagal penyesuaian'; }
         }
 
         function closeModal() {
@@ -763,10 +617,7 @@
             const content = document.getElementById('modal-content');
             if(backdrop) backdrop.style.opacity = '0';
             if(content) content.style.transform = 'translateY(100%)';
-            setTimeout(() => {
-                const modal = document.getElementById('modal-container');
-                if(modal) modal.classList.add('hidden');
-            }, 300);
+            setTimeout(() => { const modal = document.getElementById('modal-container'); if(modal) modal.classList.add('hidden'); }, 300);
         }
 
         function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(n)); }
